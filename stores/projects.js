@@ -1,4 +1,3 @@
-<script>
 import { defineStore } from 'pinia';
 
 export const useProjectsStore = defineStore('projects', {
@@ -223,4 +222,3 @@ export const useProjectsStore = defineStore('projects', {
     }
   }
 });
-</script>

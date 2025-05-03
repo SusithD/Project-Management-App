@@ -1,11 +1,30 @@
 <script setup>
-import { ref, inject } from 'vue';
+import { ref, inject, computed } from 'vue';
+import { useAuthStore } from '~/stores/auth';
 
 const logout = inject('logout');
-const user = inject('user');
+const user = inject('user', ref(null)); 
+const authStore = useAuthStore();
 const searchQuery = ref('');
 const isNotificationsOpen = ref(false);
 const isProfileOpen = ref(false);
+
+// Computed properties for user information
+const userName = computed(() => {
+  // First check if user exists and has a value
+  if (user && user.value && user.value.name) {
+    return user.value.name;
+  }
+  return authStore.userFullName || 'User';
+});
+
+const userEmail = computed(() => {
+  // First check if user exists and has a value
+  if (user && user.value && user.value.username) {
+    return user.value.username;
+  }
+  return authStore.userEmail || 'user@example.com';
+});
 
 // Toggle notifications dropdown
 const toggleNotifications = () => {
@@ -114,8 +133,8 @@ const notifications = [
             class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-elevated overflow-hidden z-50"
           >
             <div class="p-3 border-b border-neutral-200">
-              <p class="font-medium">John Doe</p>
-              <p class="text-sm text-neutral-500">john.doe@company.com</p>
+              <p class="font-medium">{{ userName }}</p>
+              <p class="text-sm text-neutral-500">{{ userEmail }}</p>
             </div>
             <ul>
               <li>

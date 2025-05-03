@@ -1,9 +1,25 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, inject, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '~/stores/auth';
 
 const router = useRouter();
+const authStore = useAuthStore();
+const user = inject('user', ref(null)); // Provide a default value
 const isMobileMenuOpen = ref(false);
+
+// Computed properties for user information
+const userName = computed(() => {
+  // First check if user exists and has a value
+  if (user && user.value && user.value.name) {
+    return user.value.name;
+  }
+  return authStore.userFullName || 'User';
+});
+
+const userRole = computed(() => {
+  return authStore.role || 'User';
+});
 
 // Navigation items
 const navItems = [
@@ -91,8 +107,8 @@ const navigateTo = (route) => {
           <span class="mdi mdi-account text-lg"></span>
         </div>
         <div class="ml-3">
-          <p class="text-sm font-medium">John Doe</p>
-          <p class="text-xs text-primary-200">Business Analyst</p>
+          <p class="text-sm font-medium">{{ userName }}</p>
+          <p class="text-xs text-primary-200">{{ userRole }}</p>
         </div>
       </div>
     </div>
@@ -135,8 +151,8 @@ const navigateTo = (route) => {
           <span class="mdi mdi-account text-lg"></span>
         </div>
         <div class="ml-3">
-          <p class="text-sm font-medium">John Doe</p>
-          <p class="text-xs text-primary-200">Business Analyst</p>
+          <p class="text-sm font-medium">{{ userName }}</p>
+          <p class="text-xs text-primary-200">{{ userRole }}</p>
         </div>
       </div>
     </div>
