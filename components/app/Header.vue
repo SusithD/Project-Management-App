@@ -76,10 +76,10 @@ const notifications = [
       <!-- Right Actions -->
       <div class="flex items-center space-x-2">
         <!-- Create Button -->
-        <button class="bg-primary-600 text-white px-4 py-2 rounded-md flex items-center shadow-sm hover:bg-primary-700 transition-colors">
+        <!-- <button class="bg-primary-600 text-white px-4 py-2 rounded-md flex items-center shadow-sm hover:bg-primary-700 transition-colors">
           <span class="mdi mdi-plus text-lg mr-1"></span>
           <span class="hidden md:inline-block">New Project</span>
-        </button>
+        </button> -->
         
         <!-- Notifications -->
         <div class="relative">

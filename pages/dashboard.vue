@@ -1,82 +1,29 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useProjectsStore } from '~/stores/projects';
+import NewProjectModal from '~/components/projects/NewProjectModal.vue';
 
 // Define layout
 definePageMeta({
   layout: 'dashboard'
 });
 
-// Sample data - in a real app this would come from an API
-const projectsData = ref([
-  { 
-    id: 1, 
-    name: 'Website Redesign', 
-    status: 'Ongoing', 
-    progress: 75, 
-    assignedTo: 'John Doe',
-    startDate: '2023-10-15',
-    endDate: '2024-05-30',
-    lastUpdated: '2024-04-22'
-  },
-  { 
-    id: 2, 
-    name: 'Mobile App Development', 
-    status: 'Ongoing', 
-    progress: 45, 
-    assignedTo: 'Jane Smith',
-    startDate: '2024-01-10',
-    endDate: '2024-07-15',
-    lastUpdated: '2024-04-20'
-  },
-  { 
-    id: 3, 
-    name: 'CRM Integration', 
-    status: 'On Hold', 
-    progress: 30, 
-    assignedTo: 'Mark Johnson',
-    startDate: '2023-12-05',
-    endDate: '2024-06-20',
-    lastUpdated: '2024-03-15'
-  },
-  { 
-    id: 4, 
-    name: 'Brand Redesign', 
-    status: 'Completed', 
-    progress: 100, 
-    assignedTo: 'Emily Clark',
-    startDate: '2023-09-01',
-    endDate: '2024-02-28',
-    lastUpdated: '2024-02-28'
-  },
-  { 
-    id: 5, 
-    name: 'Marketing Campaign', 
-    status: 'Ongoing', 
-    progress: 60, 
-    assignedTo: 'Sarah Wilson',
-    startDate: '2024-02-15',
-    endDate: '2024-06-10',
-    lastUpdated: '2024-04-18'
-  },
-  { 
-    id: 6, 
-    name: 'Data Migration', 
-    status: 'Completed', 
-    progress: 100, 
-    assignedTo: 'James Brown',
-    startDate: '2023-11-20',
-    endDate: '2024-03-10',
-    lastUpdated: '2024-03-10'
-  }
-]);
+// Get projects from store
+const projectsStore = useProjectsStore();
+const isNewProjectModalOpen = ref(false);
+
+// Fetch projects on component mount
+onMounted(async () => {
+  await projectsStore.fetchProjects();
+});
 
 // Filter projects by status
-const ongoingProjects = computed(() => projectsData.value.filter(p => p.status === 'Ongoing'));
-const completedProjects = computed(() => projectsData.value.filter(p => p.status === 'Completed'));
-const onHoldProjects = computed(() => projectsData.value.filter(p => p.status === 'On Hold'));
+const ongoingProjects = computed(() => projectsStore.projects.filter(p => p.status === 'Ongoing'));
+const completedProjects = computed(() => projectsStore.projects.filter(p => p.status === 'Completed'));
+const onHoldProjects = computed(() => projectsStore.projects.filter(p => p.status === 'On Hold'));
 
 // Summary stats
-const totalProjects = computed(() => projectsData.value.length);
+const totalProjects = computed(() => projectsStore.projects.length);
 const completedCount = computed(() => completedProjects.value.length);
 const ongoingCount = computed(() => ongoingProjects.value.length);
 const onHoldCount = computed(() => onHoldProjects.value.length);
@@ -92,11 +39,31 @@ const averageProgress = computed(() => {
   const total = ongoingProjects.value.reduce((acc, project) => acc + project.progress, 0);
   return Math.round(total / ongoingProjects.value.length);
 });
+
+// Open new project modal
+const openNewProjectModal = () => {
+  isNewProjectModalOpen.value = true;
+};
+
+// Close new project modal
+const closeNewProjectModal = () => {
+  isNewProjectModalOpen.value = false;
+};
 </script>
 
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-neutral-900 mb-6">Dashboard</h1>
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+      <h1 class="text-2xl font-bold text-neutral-900">Dashboard</h1>
+      
+      <button 
+        @click="openNewProjectModal"
+        class="mt-4 md:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700"
+      >
+        <span class="mdi mdi-plus text-lg mr-2"></span>
+        Add New Project
+      </button>
+    </div>
     
     <!-- Stats Cards Row -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -285,5 +252,11 @@ const averageProgress = computed(() => {
         </table>
       </div>
     </div>
+    
+    <!-- New Project Modal -->
+    <NewProjectModal 
+      :is-open="isNewProjectModalOpen" 
+      @close="closeNewProjectModal"
+    />
   </div>
 </template>

@@ -1,102 +1,21 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useProjectsStore } from '~/stores/projects';
+import NewProjectModal from '~/components/projects/NewProjectModal.vue';
 
 // Define layout
 definePageMeta({
   layout: 'dashboard'
 });
 
-// Sample data - in a real app this would come from an API
-const projects = ref([
-  { 
-    id: 1, 
-    name: 'Website Redesign', 
-    status: 'Ongoing', 
-    progress: 75, 
-    assignedTo: 'John Doe',
-    startDate: '2023-10-15',
-    endDate: '2024-05-30',
-    lastUpdated: '2024-04-22',
-    remarks: 'Frontend development is 80% complete. Backend integration to start next week.'
-  },
-  { 
-    id: 2, 
-    name: 'Mobile App Development', 
-    status: 'Ongoing', 
-    progress: 45, 
-    assignedTo: 'Jane Smith',
-    startDate: '2024-01-10',
-    endDate: '2024-07-15',
-    lastUpdated: '2024-04-20',
-    remarks: 'UI design completed. Development in progress.'
-  },
-  { 
-    id: 3, 
-    name: 'CRM Integration', 
-    status: 'On Hold', 
-    progress: 30, 
-    assignedTo: 'Mark Johnson',
-    startDate: '2023-12-05',
-    endDate: '2024-06-20',
-    lastUpdated: '2024-03-15',
-    remarks: 'On hold due to client requirements review.'
-  },
-  { 
-    id: 4, 
-    name: 'Brand Redesign', 
-    status: 'Completed', 
-    progress: 100, 
-    assignedTo: 'Emily Clark',
-    startDate: '2023-09-01',
-    endDate: '2024-02-28',
-    lastUpdated: '2024-02-28',
-    remarks: 'Successfully completed ahead of schedule.'
-  },
-  { 
-    id: 5, 
-    name: 'Marketing Campaign', 
-    status: 'Ongoing', 
-    progress: 60, 
-    assignedTo: 'Sarah Wilson',
-    startDate: '2024-02-15',
-    endDate: '2024-06-10',
-    lastUpdated: '2024-04-18',
-    remarks: 'Social media phase complete. Email campaign phase in progress.'
-  },
-  { 
-    id: 6, 
-    name: 'Data Migration', 
-    status: 'Completed', 
-    progress: 100, 
-    assignedTo: 'James Brown',
-    startDate: '2023-11-20',
-    endDate: '2024-03-10',
-    lastUpdated: '2024-03-10',
-    remarks: 'Data migration completed and verified.'
-  },
-  { 
-    id: 7, 
-    name: 'Security Audit', 
-    status: 'Ongoing', 
-    progress: 80, 
-    assignedTo: 'Robert Davis',
-    startDate: '2024-03-01',
-    endDate: '2024-05-15',
-    lastUpdated: '2024-04-23',
-    remarks: 'Penetration testing in progress.'
-  },
-  { 
-    id: 8, 
-    name: 'Infrastructure Upgrade', 
-    status: 'On Hold', 
-    progress: 50, 
-    assignedTo: 'William Taylor',
-    startDate: '2024-02-20',
-    endDate: '2024-06-30',
-    lastUpdated: '2024-04-10',
-    remarks: 'Waiting for hardware delivery.'
-  }
-]);
+// Get projects from store
+const projectsStore = useProjectsStore();
+const isNewProjectModalOpen = ref(false);
+
+// Fetch projects on component mount
+onMounted(async () => {
+  await projectsStore.fetchProjects();
+});
 
 // Filters
 const searchQuery = ref('');
@@ -105,17 +24,17 @@ const assigneeFilter = ref('all');
 
 // Get unique assignees for filter dropdown
 const uniqueAssignees = computed(() => {
-  const assignees = [...new Set(projects.value.map(p => p.assignedTo))];
+  const assignees = [...new Set(projectsStore.projects.map(p => p.assignedTo))];
   return assignees.sort();
 });
 
 // Filter projects based on search and filter criteria
 const filteredProjects = computed(() => {
-  return projects.value.filter(project => {
+  return projectsStore.projects.filter(project => {
     // Apply search filter
     const matchesSearch = searchQuery.value === '' ||
       project.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      project.remarks.toLowerCase().includes(searchQuery.value.toLowerCase());
+      (project.remarks && project.remarks.toLowerCase().includes(searchQuery.value.toLowerCase()));
     
     // Apply status filter
     const matchesStatus = statusFilter.value === 'all' || project.status === statusFilter.value;
@@ -137,6 +56,16 @@ const exportToExcel = () => {
 const exportToPDF = () => {
   // In a real app, this would use jspdf or similar library to generate PDF
   alert('Exporting to PDF...');
+};
+
+// Open new project modal
+const openNewProjectModal = () => {
+  isNewProjectModalOpen.value = true;
+};
+
+// Close new project modal
+const closeNewProjectModal = () => {
+  isNewProjectModalOpen.value = false;
 };
 </script>
 
@@ -162,13 +91,13 @@ const exportToPDF = () => {
           Export to PDF
         </button>
         
-        <a 
-          href="/projects/new"
+        <button 
+          @click="openNewProjectModal"
           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 shadow-sm"
         >
           <span class="mdi mdi-plus text-lg mr-2"></span>
           Add Project
-        </a>
+        </button>
       </div>
     </div>
     
@@ -315,8 +244,14 @@ const exportToPDF = () => {
         </table>
       </div>
       <div class="bg-neutral-50 px-6 py-3 border-t border-neutral-200 text-sm text-neutral-500">
-        Showing {{ filteredProjects.length }} of {{ projects.length }} projects
+        Showing {{ filteredProjects.length }} of {{ projectsStore.projects.length }} projects
       </div>
     </div>
+    
+    <!-- New Project Modal -->
+    <NewProjectModal 
+      :is-open="isNewProjectModalOpen" 
+      @close="closeNewProjectModal"
+    />
   </div>
 </template>
