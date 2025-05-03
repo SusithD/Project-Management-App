@@ -1,4 +1,3 @@
-<script>
 import { defineStore } from 'pinia';
 
 export const useAuthStore = defineStore('auth', {
@@ -30,6 +29,53 @@ export const useAuthStore = defineStore('auth', {
       this.user = null;
       this.isAuthenticated = false;
       this.role = null;
+    },
+    
+    // Complete the authentication process after OAuth redirect
+    async completeAuthentication(authCode) {
+      try {
+        console.log('Auth code received:', authCode);
+        
+        // In a real implementation, you would:
+        // 1. Exchange the auth code for tokens
+        // 2. Call your backend to validate the token and get user info
+        
+        // For now, we'll simulate a successful authentication
+        const mockUser = {
+          id: 'user123',
+          displayName: 'Demo User',
+          userPrincipalName: 'demo.user@example.com',
+          mail: 'demo.user@example.com'
+        };
+        
+        // In a production app, make an API call to exchange code for tokens
+        // Example:
+        // if (authCode) {
+        //   const tokenResponse = await $fetch('/api/auth/token', {
+        //     method: 'POST',
+        //     body: { code: authCode }
+        //   });
+        //   
+        //   // Store tokens securely
+        //   localStorage.setItem('access_token', tokenResponse.accessToken);
+        //   
+        //   // Get user info
+        //   const userInfo = await $fetch('/api/auth/me', {
+        //     headers: {
+        //       Authorization: `Bearer ${tokenResponse.accessToken}`
+        //     }
+        //   });
+        //   
+        //   this.setUser(userInfo);
+        // }
+        
+        this.setUser(mockUser);
+        return true;
+      } catch (error) {
+        console.error('Failed to complete authentication:', error);
+        this.clearUser();
+        throw error;
+      }
     },
     
     // Check if user has permission to perform an action
@@ -68,4 +114,3 @@ export const useAuthStore = defineStore('auth', {
     }
   }
 });
-</script>

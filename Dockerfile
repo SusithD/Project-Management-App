@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Install Yarn
-RUN npm install -g yarn
+# Check if Yarn is already installed, if not install it
+RUN yarn --version || npm install -g yarn
 
 WORKDIR /app
 

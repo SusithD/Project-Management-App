@@ -13,12 +13,20 @@ export default defineNuxtConfig({
   ],
   
   runtimeConfig: {
+    // Server-side environment variables
+    azureAd: {
+      clientId: process.env.AZURE_AD_CLIENT_ID,
+      tenantId: process.env.AZURE_AD_TENANT_ID,
+      clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
+      redirectUri: process.env.AZURE_AD_REDIRECT_URI
+    },
+    // Public environment variables
     public: {
       msalConfig: {
         auth: {
-          clientId: process.env.MSAL_CLIENT_ID || 'your-client-id',
-          authority: `https://login.microsoftonline.com/${process.env.MSAL_TENANT_ID || 'your-tenant-id'}`,
-          redirectUri: process.env.MSAL_REDIRECT_URI || 'http://localhost:3000/auth/redirect',
+          clientId: process.env.AZURE_AD_CLIENT_ID || 'your-client-id',
+          authority: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID || 'your-tenant-id'}`,
+          redirectUri: process.env.AZURE_AD_REDIRECT_URI || 'http://localhost:3000/auth/redirect',
           postLogoutRedirectUri: process.env.MSAL_POST_LOGOUT_REDIRECT_URI || 'http://localhost:3000'
         },
         cache: {
