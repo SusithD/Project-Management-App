@@ -233,16 +233,6 @@ watch(searchQuery, () => {
       </div>
       
       <div class="flex flex-col sm:flex-row w-full md:w-auto gap-4">
-        <div class="relative">
-          <input 
-            v-model="searchQuery"
-            type="text" 
-            placeholder="Search projects..." 
-            class="w-full rounded-lg border border-neutral-300 pl-10 pr-3 py-2 outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          >
-          <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 mdi mdi-magnify text-lg"></span>
-        </div>
-        
         <button 
           @click="openNewProjectModal"
           class="inline-flex items-center justify-center px-5 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-primary-600 hover:bg-primary-700 transition-colors duration-300"
