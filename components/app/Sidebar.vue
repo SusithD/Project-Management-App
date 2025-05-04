@@ -127,7 +127,7 @@ const handleLogout = () => {
                 <span 
                   :class="[
                     `mdi ${item.icon} text-xl mr-3`,
-                    item.active ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'
+                    item.active ? 'text-primary-600 dark:text-primary-100' : 'text-gray-500 dark:text-gray-400'
                   ]"
                 ></span>
                 <span>{{ item.label }}</span>
