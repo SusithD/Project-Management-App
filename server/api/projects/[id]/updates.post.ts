@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => {
           "updates": {
             $each: [update],
             $position: 0
-          }
+          } as any
         },
         $set: { lastUpdated: update.date }
       }
