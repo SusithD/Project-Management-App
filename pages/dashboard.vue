@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useProjectsStore } from '~/stores/projects';
+import { useRouter } from 'vue-router';
 import NewProjectModal from '~/components/projects/NewProjectModal.vue';
 
 // Define layout
@@ -8,8 +9,9 @@ definePageMeta({
   layout: 'dashboard'
 });
 
-// Get projects from store
+// Get projects from store and initialize router
 const projectsStore = useProjectsStore();
+const router = useRouter();
 const isNewProjectModalOpen = ref(false);
 
 // Fetch projects on component mount
@@ -48,6 +50,16 @@ const openNewProjectModal = () => {
 // Close new project modal
 const closeNewProjectModal = () => {
   isNewProjectModalOpen.value = false;
+};
+
+// Navigation functions
+const navigateToProject = (projectId) => {
+  router.push(`/projects/${projectId}`);
+};
+
+const navigateToProjectUpdate = (projectId, event) => {
+  event.preventDefault();
+  router.push(`/projects/${projectId}?edit=true`);
 };
 </script>
 
@@ -184,11 +196,19 @@ const closeNewProjectModal = () => {
           </div>
           
           <div class="border-t border-neutral-200 p-3 bg-neutral-50 flex justify-between">
-            <a href="#" class="text-sm text-primary-600 hover:text-primary-700 flex items-center">
+            <a 
+              @click.prevent="navigateToProject(project.id)" 
+              href="#" 
+              class="text-sm text-primary-600 hover:text-primary-700 flex items-center transition-colors duration-200"
+            >
               <span class="mdi mdi-eye mr-1"></span>
               View details
             </a>
-            <a href="#" class="text-sm text-primary-600 hover:text-primary-700 flex items-center">
+            <a 
+              @click="navigateToProjectUpdate(project.id, $event)"
+              href="#" 
+              class="text-sm text-primary-600 hover:text-primary-700 flex items-center transition-colors duration-200"
+            >
               <span class="mdi mdi-pencil mr-1"></span>
               Update
             </a>
@@ -245,7 +265,13 @@ const closeNewProjectModal = () => {
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <a href="#" class="text-primary-600 hover:text-primary-700">View</a>
+                <a 
+                  @click.prevent="navigateToProject(project.id)" 
+                  href="#" 
+                  class="text-primary-600 hover:text-primary-700 transition-colors duration-200"
+                >
+                  View
+                </a>
               </td>
             </tr>
           </tbody>
