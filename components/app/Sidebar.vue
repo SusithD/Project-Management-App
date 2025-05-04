@@ -87,7 +87,7 @@ const handleLogout = () => {
   </button>
   
   <!-- Sidebar for desktop with modern minimal design -->
-  <aside class="hidden md:flex flex-col w-64 bg-white dark:bg-primary-600 border-r border-gray-200 dark:border-gray-800 shadow-sm">
+  <aside class="hidden md:flex flex-col w-64 bg-white dark:bg-primary-700 border-r border-gray-200 dark:border-gray-800 shadow-sm">
     <div class="p-5 flex items-center">
       <span class="mdi mdi-cube-outline text-xl mr-3 text-primary-600 dark:text-primary-400"></span>
       <h1 class="text-lg font-medium text-gray-800 dark:text-white">Project Manager</h1>
