@@ -1,65 +1,91 @@
-// PUT endpoint to update a project by ID
-import { ObjectId } from 'mongodb'
-import { connectToDatabase } from '~/server/utils/database'
-import { COLLECTIONS } from '~/server/utils/schemas'
+import { defineEventHandler, readBody } from 'h3'
+import { connectToDatabase } from '~/server/utils/database';
+import { ObjectId } from 'mongodb';
 
+/**
+ * Update a project
+ * 
+ * @route PUT /api/projects/:id
+ */
 export default defineEventHandler(async (event) => {
   try {
-    // Get project ID from route parameter
-    const id = getRouterParam(event, 'id')
-    
+    // Get project ID from params
+    const id = event.context.params?.id;
     if (!id) {
-      return createError({
+      return {
         statusCode: 400,
-        statusMessage: 'Project ID is required'
-      })
+        body: { error: 'Project ID is required' }
+      };
+    }
+
+    // Get update data from request body
+    const projectData = await readBody(event);
+    if (!projectData) {
+      return {
+        statusCode: 400,
+        body: { error: 'Project data is required' }
+      };
     }
     
-    // Parse request body
-    const body = await readBody(event)
+    // Prepare update data (remove fields that shouldn't be updated directly)
+    const updateData = { ...projectData };
+    
+    // Don't overwrite these fields directly
+    delete updateData._id;
+    delete updateData.id;
+    delete updateData.createdAt;
+    delete updateData.files; // Files are managed separately
+    delete updateData.updates; // Updates are managed separately
+
+    // Ensure lastUpdated is current
+    updateData.lastUpdated = new Date().toISOString().split('T')[0];
     
     // Connect to database
-    const { db } = await connectToDatabase()
-    const collection = db.collection(COLLECTIONS.PROJECTS)
+    const { db } = await connectToDatabase();
     
-    // Add lastUpdated timestamp
-    const updateDoc = {
-      ...body,
-      lastUpdated: new Date().toISOString().split('T')[0]
-    }
+    // Update the project
+    const result = await db.collection('projects').updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
     
-    // Remove _id field if present (cannot be updated)
-    delete updateDoc._id
-    
-    // Try to update by numeric ID first
-    let result = await collection.findOneAndUpdate(
-      { id: parseInt(id) },
-      { $set: updateDoc },
-      { returnDocument: 'after' }
-    )
-    
-    // If not found, try by ObjectId
-    if (!result?.value && id.match(/^[0-9a-fA-F]{24}$/)) {
-      result = await collection.findOneAndUpdate(
-        { _id: new ObjectId(id) },
-        { $set: updateDoc },
-        { returnDocument: 'after' }
-      )
-    }
-    
-    if (!result?.value) {
-      return createError({
+    if (result.matchedCount === 0) {
+      return {
         statusCode: 404,
-        statusMessage: 'Project not found'
-      })
+        body: { error: 'Project not found' }
+      };
     }
     
-    return result.value
+    // Get the updated project
+    const updatedProject = await db.collection('projects').findOne(
+      { _id: new ObjectId(id) }
+    );
+    
+    // Ensure we found the project
+    if (!updatedProject) {
+      return {
+        statusCode: 404,
+        body: { error: 'Project not found after update' }
+      };
+    }
+    
+    // Format for response
+    const formattedProject = {
+      ...updatedProject,
+      id: updatedProject._id.toString()
+    };
+    // Use type assertion to avoid TypeScript error
+    delete (formattedProject as Record<string, any>)._id;
+    
+    return {
+      statusCode: 200,
+      body: formattedProject
+    };
   } catch (error) {
-    console.error('Error updating project:', error)
-    return createError({
+    console.error('Error updating project:', error);
+    return {
       statusCode: 500,
-      statusMessage: error instanceof Error ? error.message : 'Failed to update project'
-    })
+      body: { error: 'Failed to update project' }
+    };
   }
-})
+});
