@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
+import { useNotificationsStore } from '~/stores/notifications';
 
 // Define layout
 definePageMeta({
@@ -14,6 +15,7 @@ const projectId = route.params.id;
 const isLoading = ref(true);
 const project = ref(null);
 const authStore = useAuthStore();
+const notificationsStore = useNotificationsStore();
 const error = ref(null);
 // Store the MongoDB ObjectId once we have it
 const mongoObjectId = ref(null);
@@ -121,9 +123,12 @@ const addUpdate = async () => {
     
     // Clear input
     newUpdate.value = '';
+    
+    // Show success notification
+    notificationsStore.success('Update added successfully');
   } catch (err) {
     console.error('Error adding update:', err);
-    alert('Failed to add update. Please try again.');
+    notificationsStore.error('Failed to add update. Please try again.');
   } finally {
     isSubmittingUpdate.value = false;
   }
@@ -206,10 +211,11 @@ const uploadFile = async () => {
     }
     selectedFile.value = null;
     
-    alert('File uploaded successfully!');
+    // Show success notification
+    notificationsStore.success('File uploaded successfully!');
   } catch (err) {
     console.error('Error uploading file:', err);
-    alert('Failed to upload file. Please try again.');
+    notificationsStore.error('Failed to upload file. Please try again.');
   } finally {
     uploadingFile.value = false;
     uploadProgress.value = 0;
@@ -259,15 +265,28 @@ const downloadFile = async (file) => {
     a.click();
     window.URL.revokeObjectURL(url);
     a.remove();
+    
+    // Show info notification
+    notificationsStore.info(`Downloading ${file.name}`);
   } catch (err) {
     console.error('Error downloading file:', err);
-    alert(`Error downloading ${file.name}. Please try again.`);
+    notificationsStore.error(`Error downloading ${file.name}. Please try again.`);
   }
 };
 
 // Delete a file
 const deleteFile = async (file, index) => {
-  if (!confirm(`Are you sure you want to delete ${file.name}?`)) return;
+  // Use notification confirm instead of browser confirm
+  const confirmed = await notificationsStore.confirm(
+    `Are you sure you want to delete ${file.name}?`, 
+    {
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'warning'
+    }
+  );
+  
+  if (!confirmed) return;
   
   try {
     // Use MongoDB ObjectId for API calls
@@ -291,10 +310,10 @@ const deleteFile = async (file, index) => {
     
     // Remove from local state
     project.value.files.splice(index, 1);
-    alert('File deleted successfully');
+    notificationsStore.success('File deleted successfully');
   } catch (err) {
     console.error('Error deleting file:', err);
-    alert(`Failed to delete ${file.name}. Please try again.`);
+    notificationsStore.error(`Failed to delete ${file.name}. Please try again.`);
   }
 };
 
@@ -334,16 +353,26 @@ const saveProject = async () => {
     // Update local state
     project.value = { ...editedProject.value };
     isEditing.value = false;
-    alert('Project updated successfully');
+    notificationsStore.success('Project updated successfully');
   } catch (err) {
     console.error('Error updating project:', err);
-    alert('Failed to update project. Please try again.');
+    notificationsStore.error('Failed to update project. Please try again.');
   }
 };
 
 // Mark project as completed
 const markProjectCompleted = async () => {
-  if (!confirm('Are you sure you want to mark this project as completed?')) return;
+  // Use notification confirm instead of browser confirm
+  const confirmed = await notificationsStore.confirm(
+    'Are you sure you want to mark this project as completed?', 
+    {
+      confirmText: 'Mark Completed',
+      cancelText: 'Cancel',
+      type: 'info'
+    }
+  );
+  
+  if (!confirmed) return;
   
   try {
     // Set status to completed
@@ -354,8 +383,10 @@ const markProjectCompleted = async () => {
     };
     
     await saveProject();
+    notificationsStore.success(`${project.value.name} marked as completed`);
   } catch (err) {
     console.error('Error marking project as completed:', err);
+    notificationsStore.error('Failed to mark project as completed.');
   }
 };
 
@@ -482,7 +513,7 @@ onMounted(() => {
           <button 
             v-if="!isEditing && project.status !== 'Completed' && canEdit"
             @click="markProjectCompleted"
-            class="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md bg-white text-neutral-700 hover:bg-neutral-50"
+             class="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md bg-white text-neutral-700 hover:bg-neutral-50"
           >
             <span class="mdi mdi-check-circle text-lg mr-2 text-success-600"></span>
             Mark Completed

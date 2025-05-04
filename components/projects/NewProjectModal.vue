@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjectsStore } from '~/stores/projects';
+import { useNotificationsStore } from '~/stores/notifications';
 import ProjectForm from '~/components/projects/ProjectForm.vue';
 
 const props = defineProps({
@@ -13,6 +14,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close']);
 const projectsStore = useProjectsStore();
+const notificationsStore = useNotificationsStore();
 const router = useRouter();
 
 // Track submission state
@@ -25,10 +27,14 @@ const handleSubmit = async (formData) => {
     const newProject = await projectsStore.createProject(formData);
     emit('close');
     
+    // Show success notification
+    notificationsStore.success(`Project "${newProject.name}" created successfully`);
+    
     // Navigate to the newly created project
     router.push(`/projects/${newProject.id}`);
   } catch (error) {
     console.error('Failed to create project:', error);
+    notificationsStore.error('Failed to create project. Please try again.');
   } finally {
     isSubmitting.value = false;
   }

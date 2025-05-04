@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { useNotificationsStore } from '~/stores/notifications';
 
 export const useProjectsStore = defineStore('projects', {
   state: () => ({
@@ -60,6 +61,7 @@ export const useProjectsStore = defineStore('projects', {
     async fetchProjects(filters = {}) {
       this.isLoading = true;
       this.error = null;
+      const notificationsStore = useNotificationsStore();
       
       try {
         // Build query parameters
@@ -81,6 +83,7 @@ export const useProjectsStore = defineStore('projects', {
       } catch (error) {
         this.error = error.message || 'Failed to fetch projects';
         console.error('Error fetching projects:', error);
+        notificationsStore.error('Failed to load projects. Please try again.');
       } finally {
         this.isLoading = false;
       }
@@ -90,6 +93,7 @@ export const useProjectsStore = defineStore('projects', {
     async fetchProjectById(id) {
       this.isLoading = true;
       this.error = null;
+      const notificationsStore = useNotificationsStore();
       
       try {
         // Make API call to fetch a single project
@@ -107,6 +111,7 @@ export const useProjectsStore = defineStore('projects', {
       } catch (error) {
         this.error = error.message || 'Failed to fetch project';
         console.error('Error fetching project:', error);
+        notificationsStore.error('Failed to load project details. Please try again.');
       } finally {
         this.isLoading = false;
       }
@@ -116,6 +121,7 @@ export const useProjectsStore = defineStore('projects', {
     async createProject(projectData) {
       this.isLoading = true;
       this.error = null;
+      const notificationsStore = useNotificationsStore();
       
       try {
         // Make API call to create a new project
@@ -131,6 +137,7 @@ export const useProjectsStore = defineStore('projects', {
         if (data.value) {
           // Add the new project to the local state
           this.projects.push(data.value);
+          notificationsStore.success(`Project "${data.value.name}" created successfully`);
           return data.value;
         } else {
           throw new Error('Failed to create project');
@@ -138,6 +145,7 @@ export const useProjectsStore = defineStore('projects', {
       } catch (error) {
         this.error = error.message || 'Failed to create project';
         console.error('Error creating project:', error);
+        notificationsStore.error('Failed to create project. Please try again.');
         throw error;
       } finally {
         this.isLoading = false;
@@ -148,6 +156,7 @@ export const useProjectsStore = defineStore('projects', {
     async updateProject(id, projectData) {
       this.isLoading = true;
       this.error = null;
+      const notificationsStore = useNotificationsStore();
       
       try {
         // Make API call to update the project
@@ -173,6 +182,7 @@ export const useProjectsStore = defineStore('projects', {
             this.currentProject = data.value;
           }
           
+          notificationsStore.success(`Project "${data.value.name}" updated successfully`);
           return data.value;
         } else {
           throw new Error('Project not found');
@@ -180,6 +190,7 @@ export const useProjectsStore = defineStore('projects', {
       } catch (error) {
         this.error = error.message || 'Failed to update project';
         console.error('Error updating project:', error);
+        notificationsStore.error('Failed to update project. Please try again.');
         throw error;
       } finally {
         this.isLoading = false;
@@ -190,6 +201,7 @@ export const useProjectsStore = defineStore('projects', {
     async deleteProject(id) {
       this.isLoading = true;
       this.error = null;
+      const notificationsStore = useNotificationsStore();
       
       try {
         // Make API call to delete the project
@@ -202,6 +214,10 @@ export const useProjectsStore = defineStore('projects', {
         }
         
         if (data.value && data.value.success) {
+          // Get project name before removing it
+          const projectToDelete = this.projects.find(p => p.id === Number(id) || p._id === id);
+          const projectName = projectToDelete ? projectToDelete.name : 'Project';
+          
           // Remove the project from the local state
           const index = this.projects.findIndex(p => p.id === Number(id) || p._id === id);
           
@@ -214,6 +230,7 @@ export const useProjectsStore = defineStore('projects', {
             this.currentProject = null;
           }
           
+          notificationsStore.success(`${projectName} has been deleted successfully`);
           return true;
         } else {
           throw new Error('Project not found');
@@ -221,6 +238,7 @@ export const useProjectsStore = defineStore('projects', {
       } catch (error) {
         this.error = error.message || 'Failed to delete project';
         console.error('Error deleting project:', error);
+        notificationsStore.error('Failed to delete project. Please try again.');
         throw error;
       } finally {
         this.isLoading = false;

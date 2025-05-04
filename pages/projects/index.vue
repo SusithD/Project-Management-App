@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, inject } from 'vue';
 import { useProjectsStore } from '~/stores/projects';
+import { useNotificationsStore } from '~/stores/notifications';
 import NewProjectModal from '~/components/projects/NewProjectModal.vue';
 
 // Define layout
@@ -10,11 +11,19 @@ definePageMeta({
 
 // Get projects from store
 const projectsStore = useProjectsStore();
+const notificationsStore = useNotificationsStore();
+const notify = inject('notify'); // Use the notification plugin
 const isNewProjectModalOpen = ref(false);
+const isLoading = ref(true);
 
 // Fetch projects on component mount
 onMounted(async () => {
-  await projectsStore.fetchProjects();
+  try {
+    isLoading.value = true;
+    await projectsStore.fetchProjects();
+  } finally {
+    isLoading.value = false;
+  }
 });
 
 // Filters
@@ -49,13 +58,67 @@ const filteredProjects = computed(() => {
 // Handle export to Excel
 const exportToExcel = () => {
   // In a real app, this would use xlsx or similar library to generate Excel file
-  alert('Exporting to Excel...');
+  notify.info('Preparing Excel export...', { timeout: 2000 });
+  
+  // Simulate export process
+  setTimeout(() => {
+    notify.success('Export completed! Your Excel file is ready.', {
+      actions: [
+        {
+          text: 'Download',
+          primary: true,
+          onClick: () => {
+            // Download logic would go here
+            notify.info('Excel file downloaded successfully');
+          }
+        }
+      ]
+    });
+  }, 1500);
 };
 
 // Handle export to PDF
 const exportToPDF = () => {
   // In a real app, this would use jspdf or similar library to generate PDF
-  alert('Exporting to PDF...');
+  notify.info('Preparing PDF export...', { timeout: 2000 });
+  
+  // Simulate export process
+  setTimeout(() => {
+    notify.success('Export completed! Your PDF is ready.', {
+      actions: [
+        {
+          text: 'Download',
+          primary: true,
+          onClick: () => {
+            // Download logic would go here
+            notify.info('PDF file downloaded successfully');
+          }
+        }
+      ]
+    });
+  }, 1500);
+};
+
+// Delete project with confirmation
+const deleteProject = async (project) => {
+  // Use confirmation notification
+  const confirmed = await notify.confirm(
+    `Are you sure you want to delete "${project.name}"?`,
+    {
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'error'
+    }
+  );
+  
+  if (confirmed) {
+    try {
+      await projectsStore.deleteProject(project.id);
+      notify.success(`Project "${project.name}" was deleted successfully`);
+    } catch (error) {
+      notify.error(`Failed to delete project: ${error.message}`);
+    }
+  }
 };
 
 // Open new project modal
@@ -66,6 +129,15 @@ const openNewProjectModal = () => {
 // Close new project modal
 const closeNewProjectModal = () => {
   isNewProjectModalOpen.value = false;
+};
+
+// Clear all filters
+const clearFilters = () => {
+  searchQuery.value = '';
+  statusFilter.value = 'all';
+  assigneeFilter.value = 'all';
+  
+  notify.info('Filters have been cleared', { timeout: 2000 });
 };
 </script>
 
@@ -153,8 +225,13 @@ const closeNewProjectModal = () => {
       </div>
     </div>
     
+    <!-- Loading State -->
+    <div v-if="isLoading" class="flex justify-center items-center h-64">
+      <div class="animate-spin rounded-full h-12 w-12 border-4 border-primary-600 border-t-transparent"></div>
+    </div>
+    
     <!-- Projects List -->
-    <div class="bg-white rounded-lg shadow-card overflow-hidden">
+    <div v-else class="bg-white rounded-lg shadow-card overflow-hidden">
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-neutral-200">
           <thead class="bg-neutral-50">
@@ -225,8 +302,9 @@ const closeNewProjectModal = () => {
                 <div class="text-sm text-neutral-700">{{ project.lastUpdated }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <a :href="`/projects/${project.id}`" class="text-primary-600 hover:text-primary-900 mr-4">View</a>
-                <a :href="`/projects/${project.id}/edit`" class="text-primary-600 hover:text-primary-900">Edit</a>
+                <NuxtLink :to="`/projects/${project.id}`" class="text-primary-600 hover:text-primary-900 mr-3">View</NuxtLink>
+                <NuxtLink :to="`/projects/${project.id}`" class="text-primary-600 hover:text-primary-900 mr-3">Edit</NuxtLink>
+                <button @click="deleteProject(project)" class="text-error-600 hover:text-error-900">Delete</button>
               </td>
             </tr>
             <tr v-if="filteredProjects.length === 0">
@@ -234,7 +312,7 @@ const closeNewProjectModal = () => {
                 <div class="flex flex-col items-center">
                   <span class="mdi mdi-folder-search-outline text-4xl text-neutral-400 mb-2"></span>
                   No projects found matching your filters.
-                  <button @click="searchQuery = ''; statusFilter = 'all'; assigneeFilter = 'all'" class="mt-2 text-primary-600 hover:text-primary-700">
+                  <button @click="clearFilters" class="mt-2 text-primary-600 hover:text-primary-700">
                     Clear filters
                   </button>
                 </div>
