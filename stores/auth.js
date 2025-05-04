@@ -1,11 +1,16 @@
 import { defineStore } from 'pinia';
 
 export const useAuthStore = defineStore('auth', {
-  state: () => ({
-    user: null,
-    isAuthenticated: false,
-    role: null, // 'project_member', 'business_analyst', 'admin'
-  }),
+  state: () => {
+    // Try to load state from localStorage on initialization
+    const savedState = process.client ? JSON.parse(localStorage.getItem('auth_state') || 'null') : null;
+    
+    return {
+      user: savedState?.user || null,
+      isAuthenticated: savedState?.isAuthenticated || false,
+      role: savedState?.role || null, // 'project_member', 'business_analyst', 'admin'
+    };
+  },
   
   getters: {
     isAdmin: (state) => state.role === 'admin',
@@ -23,12 +28,26 @@ export const useAuthStore = defineStore('auth', {
       // In a real app, you would fetch the role from your backend
       // For now, we'll set a default role
       this.role = 'business_analyst';
+      
+      // Persist state to localStorage
+      if (process.client) {
+        localStorage.setItem('auth_state', JSON.stringify({
+          user: this.user,
+          isAuthenticated: this.isAuthenticated,
+          role: this.role
+        }));
+      }
     },
     
     clearUser() {
       this.user = null;
       this.isAuthenticated = false;
       this.role = null;
+      
+      // Clear persisted state
+      if (process.client) {
+        localStorage.removeItem('auth_state');
+      }
     },
     
     // Complete the authentication process after OAuth redirect

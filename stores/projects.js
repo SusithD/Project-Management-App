@@ -57,42 +57,27 @@ export const useProjectsStore = defineStore('projects', {
   
   actions: {
     // Fetch all projects
-    async fetchProjects() {
+    async fetchProjects(filters = {}) {
       this.isLoading = true;
       this.error = null;
       
       try {
-        // In a real app, this would be an API call
-        // For demo purposes, we'll use a timeout and mock data
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Build query parameters
+        const queryParams = new URLSearchParams();
         
-        this.projects = [
-          { 
-            id: 1, 
-            name: 'Website Redesign', 
-            status: 'Ongoing', 
-            progress: 75, 
-            assignedTo: 'John Doe',
-            startDate: '2023-10-15',
-            endDate: '2024-05-30',
-            lastUpdated: '2024-04-22',
-            remarks: 'Frontend development is 80% complete. Backend integration to start next week.',
-            notes: 'Client requested additional features for the user dashboard. Need to adjust timeline.'
-          },
-          { 
-            id: 2, 
-            name: 'Mobile App Development', 
-            status: 'Ongoing', 
-            progress: 45, 
-            assignedTo: 'Jane Smith',
-            startDate: '2024-01-10',
-            endDate: '2024-07-15',
-            lastUpdated: '2024-04-20',
-            remarks: 'UI design completed. Development in progress.',
-            notes: 'Need to follow up with client regarding app store requirements.'
-          },
-          // ...more projects
-        ];
+        if (filters.search) queryParams.append('search', filters.search);
+        if (filters.status && filters.status !== 'all') queryParams.append('status', filters.status);
+        if (filters.assignee && filters.assignee !== 'all') queryParams.append('assignee', filters.assignee);
+        if (filters.category && filters.category !== 'all') queryParams.append('category', filters.category);
+        if (filters.priority && filters.priority !== 'all') queryParams.append('priority', filters.priority);
+        
+        // Make API call to fetch projects
+        const queryString = queryParams.toString();
+        const url = `/api/projects${queryString ? '?' + queryString : ''}`;
+        
+        const { data } = await useFetch(url);
+        // Fix: Extract just the projects array from the response
+        this.projects = data.value?.projects || [];
       } catch (error) {
         this.error = error.message || 'Failed to fetch projects';
         console.error('Error fetching projects:', error);
@@ -107,14 +92,15 @@ export const useProjectsStore = defineStore('projects', {
       this.error = null;
       
       try {
-        // In a real app, this would be an API call
-        // For demo purposes, we'll use a timeout and mock data
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Make API call to fetch a single project
+        const { data, error } = await useFetch(`/api/projects/${id}`);
         
-        const foundProject = this.projects.find(p => p.id === Number(id));
+        if (error.value) {
+          throw new Error(error.value.message || 'Failed to fetch project');
+        }
         
-        if (foundProject) {
-          this.currentProject = foundProject;
+        if (data.value) {
+          this.currentProject = data.value;
         } else {
           throw new Error('Project not found');
         }
@@ -132,18 +118,23 @@ export const useProjectsStore = defineStore('projects', {
       this.error = null;
       
       try {
-        // In a real app, this would be an API call
-        // For demo purposes, we'll use a timeout and mock data
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Make API call to create a new project
+        const { data, error } = await useFetch('/api/projects', {
+          method: 'POST',
+          body: projectData
+        });
         
-        const newProject = {
-          id: this.projects.length + 1,
-          ...projectData,
-          lastUpdated: new Date().toISOString().split('T')[0]
-        };
+        if (error.value) {
+          throw new Error(error.value.message || 'Failed to create project');
+        }
         
-        this.projects.push(newProject);
-        return newProject;
+        if (data.value) {
+          // Add the new project to the local state
+          this.projects.push(data.value);
+          return data.value;
+        } else {
+          throw new Error('Failed to create project');
+        }
       } catch (error) {
         this.error = error.message || 'Failed to create project';
         console.error('Error creating project:', error);
@@ -159,24 +150,30 @@ export const useProjectsStore = defineStore('projects', {
       this.error = null;
       
       try {
-        // In a real app, this would be an API call
-        // For demo purposes, we'll use a timeout and mock data
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Make API call to update the project
+        const { data, error } = await useFetch(`/api/projects/${id}`, {
+          method: 'PUT',
+          body: projectData
+        });
         
-        const index = this.projects.findIndex(p => p.id === Number(id));
+        if (error.value) {
+          throw new Error(error.value.message || 'Failed to update project');
+        }
         
-        if (index !== -1) {
-          this.projects[index] = {
-            ...this.projects[index],
-            ...projectData,
-            lastUpdated: new Date().toISOString().split('T')[0]
-          };
+        if (data.value) {
+          // Update the project in the local state
+          const index = this.projects.findIndex(p => p.id === Number(id) || p._id === id);
           
-          if (this.currentProject && this.currentProject.id === Number(id)) {
-            this.currentProject = this.projects[index];
+          if (index !== -1) {
+            this.projects[index] = data.value;
           }
           
-          return this.projects[index];
+          // Update currentProject if it's the same project
+          if (this.currentProject && (this.currentProject.id === Number(id) || this.currentProject._id === id)) {
+            this.currentProject = data.value;
+          }
+          
+          return data.value;
         } else {
           throw new Error('Project not found');
         }
@@ -195,16 +192,25 @@ export const useProjectsStore = defineStore('projects', {
       this.error = null;
       
       try {
-        // In a real app, this would be an API call
-        // For demo purposes, we'll use a timeout and mock data
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Make API call to delete the project
+        const { data, error } = await useFetch(`/api/projects/${id}`, {
+          method: 'DELETE'
+        });
         
-        const index = this.projects.findIndex(p => p.id === Number(id));
+        if (error.value) {
+          throw new Error(error.value.message || 'Failed to delete project');
+        }
         
-        if (index !== -1) {
-          this.projects.splice(index, 1);
+        if (data.value && data.value.success) {
+          // Remove the project from the local state
+          const index = this.projects.findIndex(p => p.id === Number(id) || p._id === id);
           
-          if (this.currentProject && this.currentProject.id === Number(id)) {
+          if (index !== -1) {
+            this.projects.splice(index, 1);
+          }
+          
+          // Clear currentProject if it's the same project
+          if (this.currentProject && (this.currentProject.id === Number(id) || this.currentProject._id === id)) {
             this.currentProject = null;
           }
           

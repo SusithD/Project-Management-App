@@ -12,118 +12,112 @@ const error = ref('');
 const status = ref('Processing authentication...');
 
 onMounted(async () => {
-  if (process.client) {
-    try {
-      // Check for error parameters in URL
-      if (route.query.error) {
-        error.value = `${route.query.error}: ${route.query.error_description || 'Authentication failed'}`;
-        setTimeout(() => {
-          router.push('/login');
-        }, 3000);
-        return;
+  if (!process.client) return;
+
+  try {
+    // Check for error parameters in URL
+    if (route.query.error) {
+      error.value = `${route.query.error}: ${route.query.error_description || 'Authentication failed'}`;
+      setTimeout(() => router.push('/login'), 3000);
+      return;
+    }
+    
+    status.value = 'Finalizing authentication with Microsoft...';
+    
+    // Create MSAL instance for handling this redirect
+    const msalConfig = {
+      auth: {
+        clientId: config.public.msalConfig.auth.clientId,
+        authority: config.public.msalConfig.auth.authority,
+        redirectUri: config.public.msalConfig.auth.redirectUri
+      },
+      cache: {
+        cacheLocation: 'localStorage',
+        storeAuthStateInCookie: true
       }
-      
-      status.value = 'Finalizing authentication with Microsoft...';
-      
-      // Create a new MSAL instance for handling this redirect
-      const msalConfig = {
-        auth: {
-          clientId: config.public.msalConfig.auth.clientId,
-          authority: config.public.msalConfig.auth.authority,
-          redirectUri: config.public.msalConfig.auth.redirectUri
-        },
-        cache: {
-          cacheLocation: 'localStorage',
-          storeAuthStateInCookie: true
-        }
-      };
-      
-      const msalInstance = new PublicClientApplication(msalConfig);
+    };
+    
+    const msalInstance = new PublicClientApplication(msalConfig);
+    
+    try {
+      // Initialize MSAL first
       await msalInstance.initialize();
       
-      try {
-        // Handle the redirect flow including URL fragments for implicit flow
-        const response = await msalInstance.handleRedirectPromise(window.location.hash);
+      // Handle redirect - this returns null if called outside of a redirect context
+      const response = await msalInstance.handleRedirectPromise();
+      
+      // Get any accounts that might be in the cache
+      const accounts = msalInstance.getAllAccounts();
+      
+      if (response) {
+        // We have a direct response from the redirect
+        console.log("Authentication successful", response);
         
-        // Check if we got a response
-        if (response) {
-          console.log("Authentication successful", response);
+        // Get the user account from the response
+        const account = response.account;
+        if (account) {
+          // Set the user in our auth store
+          authStore.setUser({
+            id: account.localAccountId || account.homeAccountId,
+            displayName: account.name || "User",
+            userPrincipalName: account.username,
+            mail: account.username,
+            // Store tokens for API calls (you would typically do this in auth store)
+            accessToken: response.accessToken,
+            idToken: response.idToken
+          });
           
-          // Get the accounts from MSAL
-          const accounts = msalInstance.getAllAccounts();
+          status.value = 'Authentication successful! Redirecting...';
+          setTimeout(() => router.push('/dashboard'), 1000);
+          return;
+        }
+      } else if (accounts.length > 0) {
+        // No direct response, but we have accounts in the cache
+        const account = accounts[0];
+        
+        // Try to get a token silently to verify the account is valid
+        try {
+          const silentRequest = {
+            scopes: ['User.Read'],
+            account: account
+          };
           
-          if (accounts.length > 0) {
-            // Update the auth store
+          const silentResult = await msalInstance.acquireTokenSilent(silentRequest);
+          
+          if (silentResult) {
+            // Account is valid, set the user in auth store
             authStore.setUser({
-              id: accounts[0].localAccountId || accounts[0].homeAccountId,
-              displayName: accounts[0].name || "User",
-              userPrincipalName: accounts[0].username,
-              mail: accounts[0].username
+              id: account.localAccountId || account.homeAccountId,
+              displayName: account.name || "User",
+              userPrincipalName: account.username,
+              mail: account.username,
+              accessToken: silentResult.accessToken,
+              idToken: silentResult.idToken
             });
             
-            status.value = 'Authentication successful! Redirecting...';
-            setTimeout(() => {
-              router.push('/dashboard');
-            }, 1000);
+            status.value = 'Authentication verified! Redirecting...';
+            setTimeout(() => router.push('/dashboard'), 1000);
             return;
           }
-        }
-        
-        // Check if user is already authenticated
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) {
-          // User is already logged in
-          authStore.setUser({
-            id: accounts[0].localAccountId || accounts[0].homeAccountId,
-            displayName: accounts[0].name || "User",
-            userPrincipalName: accounts[0].username,
-            mail: accounts[0].username
-          });
-          
-          status.value = 'Already authenticated! Redirecting...';
-          setTimeout(() => {
-            router.push('/dashboard');
-          }, 1000);
-        } else {
-          // No user found, redirect to login
-          error.value = 'No authenticated user found';
-          setTimeout(() => {
-            router.push('/login');
-          }, 2000);
-        }
-      } catch (err) {
-        console.error('MSAL redirect handling error:', err);
-        
-        // Still try to check if we have an account (sometimes errors happen but authentication succeeds)
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) {
-          // User is authenticated despite the error
-          authStore.setUser({
-            id: accounts[0].localAccountId || accounts[0].homeAccountId,
-            displayName: accounts[0].name || "User",
-            userPrincipalName: accounts[0].username,
-            mail: accounts[0].username
-          });
-          
-          status.value = 'Authentication completed! Redirecting...';
-          setTimeout(() => {
-            router.push('/dashboard');
-          }, 1000);
-        } else {
-          error.value = `Authentication error: ${err.message || 'Unknown error'}`;
-          setTimeout(() => {
-            router.push('/login');
-          }, 3000);
+        } catch (silentErr) {
+          console.warn('Silent token acquisition failed:', silentErr);
+          // Continue to login redirect below
         }
       }
-    } catch (err) {
-      error.value = 'Authentication failed. Please try again.';
-      console.error('Auth redirect error:', err);
       
-      setTimeout(() => {
-        router.push('/login');
-      }, 3000);
+      // If we reach here, we couldn't authenticate
+      error.value = 'Authentication failed or session expired';
+      setTimeout(() => router.push('/login'), 2000);
+      
+    } catch (msalErr) {
+      console.error('MSAL error:', msalErr);
+      error.value = `Authentication error: ${msalErr.message || 'Unknown MSAL error'}`;
+      setTimeout(() => router.push('/login'), 3000);
     }
+  } catch (err) {
+    console.error('General auth redirect error:', err);
+    error.value = 'Authentication failed. Please try again.';
+    setTimeout(() => router.push('/login'), 3000);
   }
 });
 </script>
