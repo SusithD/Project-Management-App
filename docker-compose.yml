@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   app:
     build: .
@@ -9,6 +11,30 @@ services:
       - AZURE_AD_TENANT_ID=${AZURE_AD_TENANT_ID}
       - AZURE_AD_REDIRECT_URI=${AZURE_AD_REDIRECT_URI}
       - AZURE_AD_CLIENT_SECRET=${AZURE_AD_CLIENT_SECRET}
+      - MONGODB_URI=mongodb://mongodb:27017/project_management
     volumes:
       - ./uploads:/app/uploads
     restart: unless-stopped
+    depends_on:
+      - mongodb
+    networks:
+      - app-network
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=project_management
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:

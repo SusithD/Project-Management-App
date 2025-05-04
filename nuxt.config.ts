@@ -20,6 +20,11 @@ export default defineNuxtConfig({
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
       redirectUri: process.env.AZURE_AD_REDIRECT_URI
     },
+    // MongoDB configuration
+    mongodb: {
+      uri: process.env.MONGO_URI || 'mongodb://localhost:27017',
+      dbName: process.env.MONGO_DB || 'project_management'
+    },
     // Public environment variables
     public: {
       msalConfig: {
