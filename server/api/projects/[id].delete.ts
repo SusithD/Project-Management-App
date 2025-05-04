@@ -1,7 +1,7 @@
 // DELETE endpoint to remove a project by ID
 import { ObjectId } from 'mongodb'
-import { connectToDatabase } from '../../utils/database'
-import { COLLECTIONS } from '../../utils/schemas'
+import { connectToDatabase } from '~/server/utils/database'
+import { COLLECTIONS } from '~/server/utils/schemas'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -22,12 +22,11 @@ export default defineEventHandler(async (event) => {
     // Try to delete by numeric ID first
     let result = await collection.findOneAndDelete({ id: parseInt(id) })
     
-    // If not found by numeric ID, try to delete by MongoDB ObjectId
+    // If not found, try by ObjectId
     if (!result?.value && id.match(/^[0-9a-fA-F]{24}$/)) {
       result = await collection.findOneAndDelete({ _id: new ObjectId(id) })
     }
     
-    // If project is not found, return a 404
     if (!result?.value) {
       return createError({
         statusCode: 404,
@@ -35,7 +34,6 @@ export default defineEventHandler(async (event) => {
       })
     }
     
-    // Return success response with the deleted project
     return {
       success: true,
       message: 'Project deleted successfully',

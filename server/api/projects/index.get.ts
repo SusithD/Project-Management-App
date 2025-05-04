@@ -7,11 +7,9 @@ export default defineEventHandler(async (event) => {
   try {
     // Get query parameters for filtering
     const query = getQuery(event)
-    
-    // Build MongoDB filter based on query parameters
     const filter: Record<string, any> = {}
     
-    // Apply filters if they exist
+    // Apply text search filter
     if (query.search) {
       filter.$or = [
         { name: { $regex: query.search, $options: 'i' } },
@@ -20,51 +18,42 @@ export default defineEventHandler(async (event) => {
       ]
     }
     
+    // Apply simple filters
     if (query.status) filter.status = query.status
     if (query.assignee) filter.assignedTo = query.assignee
     if (query.category) filter.category = query.category
     if (query.priority) filter.priority = query.priority
     
-    // Date filtering
+    // Apply date range filters
     if (query.startAfter || query.endBefore) {
       filter.$and = []
-      
-      if (query.startAfter) {
-        filter.$and.push({ startDate: { $gte: query.startAfter } })
-      }
-      
-      if (query.endBefore) {
-        filter.$and.push({ endDate: { $lte: query.endBefore } })
-      }
+      if (query.startAfter) filter.$and.push({ startDate: { $gte: query.startAfter } })
+      if (query.endBefore) filter.$and.push({ endDate: { $lte: query.endBefore } })
     }
     
-    // Connect to database
+    // Get database connection
     const { db } = await connectToDatabase()
     const collection = db.collection(COLLECTIONS.PROJECTS)
     
-    // Get sort parameters
+    // Setup sorting
     const sortField = String(query.sortBy || 'createdAt')
     const sortOrder = query.sortOrder === 'asc' ? 1 : -1
+    const sortOptions: Sort = { [sortField]: sortOrder }
     
-    // Create sort options with MongoDB's expected type format
-    const sortOptions: Sort = {
-      [sortField]: sortOrder
-    }
-    
-    // Pagination
+    // Setup pagination
     const page = parseInt(query.page as string) || 1
     const limit = parseInt(query.limit as string) || 100
     const skip = (page - 1) * limit
     
-    // Execute query with sort and pagination
-    const projects = await collection.find(filter)
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limit)
-      .toArray()
-    
-    // Get total count for pagination metadata
-    const total = await collection.countDocuments(filter)
+    // Execute query
+    const [projects, total] = await Promise.all([
+      collection.find(filter)
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limit)
+        .toArray(),
+      collection.countDocuments(filter)
+    ])
     
     // Return results with pagination metadata
     return {

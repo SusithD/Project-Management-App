@@ -1,6 +1,5 @@
 // POST endpoint to create a new project
-import { ObjectId } from 'mongodb'
-import { Int32 } from 'mongodb'  // Ensure Int32 is imported correctly
+import { Int32 } from 'mongodb'
 import { connectToDatabase } from '~/server/utils/database'
 import { COLLECTIONS, Project } from '~/server/utils/schemas'
 
@@ -13,19 +12,19 @@ export default defineEventHandler(async (event) => {
     const { db } = await connectToDatabase()
     const collection = db.collection(COLLECTIONS.PROJECTS)
     
-    // Get the next project ID - find the highest ID and increment
+    // Get the next project ID
     const lastProject = await collection.find().sort({ id: -1 }).limit(1).toArray()
     const nextId = lastProject.length > 0 ? lastProject[0].id + 1 : 1
     
-    // Current date for created/updated timestamps
+    // Current date for timestamps
     const currentDate = new Date().toISOString().split('T')[0]
     
-    // Create new project document with proper type conversions
+    // Create new project document
     const newProject: Project = {
       id: new Int32(nextId),
       name: body.name,
       status: body.status || 'Ongoing',
-      progress: new Int32(parseInt(body.progress) || 0),  // Ensure progress is converted to Int32
+      progress: new Int32(parseInt(body.progress) || 0),
       assignedTo: body.assignedTo,
       startDate: body.startDate,
       endDate: body.endDate,

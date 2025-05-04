@@ -1,30 +1,22 @@
-// Database connection utility
 import { MongoClient, Db } from 'mongodb'
 import { COLLECTIONS, projectValidationSchema } from '~/server/utils/schemas'
 import { useRuntimeConfig } from '#imports'
 
-// Connection variables
+// Singleton connection variables
 let client: MongoClient | null = null
 let db: Db | null = null
 
-// Get runtime config
+// Get MongoDB connection details from config
 const config = useRuntimeConfig()
-
-// Get MongoDB connection details from runtime config
-const MONGO_URI = process.env.MONGODB_URI || config.mongodb?.uri || process.env.MONGO_URI || 'mongodb://localhost:27017'
+const MONGO_URI = config.mongodb?.uri || process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017'
 const MONGO_DB = config.mongodb?.dbName || process.env.MONGO_DB || 'project_management'
 
-// Option parameters for connecting to MongoDB
+// Connection options
 const CONNECTION_OPTIONS = {
-  // Retry to connect
   retryWrites: true,
-  // Connection timeout in milliseconds (30 seconds)
   connectTimeoutMS: 30000,
-  // Socket timeout in milliseconds (45 seconds)
   socketTimeoutMS: 45000,
-  // Max number of reconnect attempts
   maxPoolSize: 50,
-  // Whether to wait for reconnect
   waitQueueTimeoutMS: 10000
 }
 
@@ -32,7 +24,7 @@ const CONNECTION_OPTIONS = {
  * Connects to MongoDB and returns the database and client instances
  */
 export async function connectToDatabase() {
-  // If we already have a connection, return it
+  // Return existing connection if available
   if (client && db) {
     return { db, client }
   }
@@ -40,14 +32,10 @@ export async function connectToDatabase() {
   try {
     console.log(`Connecting to MongoDB at ${MONGO_URI}...`)
     
-    // Create a new client and connect
     client = new MongoClient(MONGO_URI, CONNECTION_OPTIONS)
     await client.connect()
-    
-    // Get database
     db = client.db(MONGO_DB)
     
-    // Setup collections and validations if they don't exist
     await setupCollections(db)
     
     console.log(`Connected to MongoDB database: ${MONGO_DB}`)
@@ -63,7 +51,6 @@ export async function connectToDatabase() {
  */
 async function setupCollections(db: Db) {
   try {
-    // Check if projects collection exists, if not create it
     const collections = await db.listCollections().toArray()
     const collectionNames = collections.map(c => c.name)
     
@@ -73,28 +60,27 @@ async function setupCollections(db: Db) {
       console.log(`Created ${COLLECTIONS.PROJECTS} collection with validation`)
       
       // Create indexes for projects
-      await db.collection(COLLECTIONS.PROJECTS).createIndex({ name: 1 })
-      await db.collection(COLLECTIONS.PROJECTS).createIndex({ status: 1 })
-      await db.collection(COLLECTIONS.PROJECTS).createIndex({ assignedTo: 1 })
-      await db.collection(COLLECTIONS.PROJECTS).createIndex({ priority: 1 })
-      await db.collection(COLLECTIONS.PROJECTS).createIndex({ category: 1 })
+      const projectCollection = db.collection(COLLECTIONS.PROJECTS)
+      await Promise.all([
+        projectCollection.createIndex({ name: 1 }),
+        projectCollection.createIndex({ status: 1 }),
+        projectCollection.createIndex({ assignedTo: 1 }),
+        projectCollection.createIndex({ priority: 1 }),
+        projectCollection.createIndex({ category: 1 })
+      ]);
     }
     
-    // Setup users collection (will be needed for authentication later)
+    // Setup users collection
     if (!collectionNames.includes(COLLECTIONS.USERS)) {
       await db.createCollection(COLLECTIONS.USERS)
       console.log(`Created ${COLLECTIONS.USERS} collection`)
-      
-      // Create indexes for users
       await db.collection(COLLECTIONS.USERS).createIndex({ email: 1 }, { unique: true })
     }
     
-    // Setup files collection (for project attachments)
+    // Setup files collection
     if (!collectionNames.includes(COLLECTIONS.FILES)) {
       await db.createCollection(COLLECTIONS.FILES)
       console.log(`Created ${COLLECTIONS.FILES} collection`)
-      
-      // Create indexes for files
       await db.collection(COLLECTIONS.FILES).createIndex({ projectId: 1 })
     }
   } catch (error) {

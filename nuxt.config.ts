@@ -54,5 +54,33 @@ export default defineNuxtConfig({
         { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap' }
       ]
     }
+  },
+  
+  // Persist hydration state for login information 
+  imports: {
+    autoImport: true,
+    dirs: [
+      'stores'
+    ]
+  },
+  
+  // SSR detection
+  ssr: true,
+  
+  // Improve client/server state handling
+  experimental: {
+    asyncContext: true,
+    payloadExtraction: true
+  },
+  
+  // Route middleware config to better handle auth redirects
+  routeRules: {
+    // Public routes
+    '/login': { ssr: false },
+    '/auth/**': { ssr: false },
+    
+    // Protected routes that need authentication
+    '/dashboard/**': { ssr: false },
+    '/projects/**': { ssr: false }
   }
 })

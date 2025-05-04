@@ -8,6 +8,14 @@ export const COLLECTIONS = {
   FILES: 'files'
 };
 
+// Project update interface
+export interface ProjectUpdate {
+  id: string;
+  message: string;
+  date: string;
+  user: string;
+}
+
 // Project interface
 export interface Project {
   id: number | Int32;
@@ -26,14 +34,6 @@ export interface Project {
   team: string[];
   updates?: ProjectUpdate[];
   _id?: ObjectId;
-}
-
-// Project update interface
-export interface ProjectUpdate {
-  id: string;
-  message: string;
-  date: string;
-  user: string;
 }
 
 // User interface

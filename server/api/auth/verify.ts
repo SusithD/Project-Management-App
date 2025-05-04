@@ -1,37 +1,37 @@
+// Token verification endpoint
 export default defineEventHandler(async (event) => {
   try {
     // Get authorization header
     const authorization = getRequestHeader(event, 'authorization')
     
+    // Validate authorization header format
     if (!authorization || !authorization.startsWith('Bearer ')) {
-      return {
+      return createError({
         statusCode: 401,
-        body: {
-          error: 'Unauthorized',
-          message: 'Missing or invalid authorization token'
-        }
-      }
+        statusMessage: 'Unauthorized',
+        data: { message: 'Missing or invalid authorization token' }
+      })
     }
     
     const token = authorization.substring(7)
     
-    // In a real app, you would verify the token with Microsoft Identity Platform
-    // For demo purposes, we'll return a mock user
+    // NOTE: In a production app, you would verify the token with your identity provider
+    // This is placeholder code for demonstration purposes
+    
+    // Return mock user data
     return {
       id: '12345',
       displayName: 'John Doe',
       userPrincipalName: 'john.doe@company.com',
-      mail: 'john.doe@company.com',
-      role: 'business_analyst',
+      email: 'john.doe@company.com',
+      role: 'business_analyst'
     }
   } catch (error) {
     console.error('Token verification error:', error)
-    return {
+    return createError({
       statusCode: 500,
-      body: {
-        error: 'Internal Server Error',
-        message: 'Failed to verify token'
-      }
-    }
+      statusMessage: 'Internal Server Error',
+      data: { message: 'Failed to verify token' }
+    })
   }
 })
