@@ -34,7 +34,19 @@ export default defineEventHandler(async (event) => {
       notes: body.notes || '',
       priority: body.priority,
       category: body.category,
-      team: Array.isArray(body.team) ? body.team : []
+      team: Array.isArray(body.team) ? body.team : [],
+      
+      // New fields
+      company: body.company || '',
+      statusPhase: body.statusPhase || '',
+      deadline: body.deadline || '',
+      comments: body.comments || '',
+      developers: Array.isArray(body.developers) ? body.developers : [],
+      blockers: body.blockers || '',
+      responsiblePerson: body.responsiblePerson || '',
+      initiallyRaisedOn: body.initiallyRaisedOn || currentDate,
+      pendingDays: new Int32(parseInt(body.pendingDays) || 0),
+      feedbackForBlockers: body.feedbackForBlockers || ''
     }
     
     // Insert the new project

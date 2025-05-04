@@ -14,7 +14,12 @@ export default defineEventHandler(async (event) => {
       filter.$or = [
         { name: { $regex: query.search, $options: 'i' } },
         { remarks: { $regex: query.search, $options: 'i' } },
-        { notes: { $regex: query.search, $options: 'i' } }
+        { notes: { $regex: query.search, $options: 'i' } },
+        // Search in new fields
+        { company: { $regex: query.search, $options: 'i' } },
+        { comments: { $regex: query.search, $options: 'i' } },
+        { blockers: { $regex: query.search, $options: 'i' } },
+        { feedbackForBlockers: { $regex: query.search, $options: 'i' } }
       ]
     }
     
@@ -24,11 +29,23 @@ export default defineEventHandler(async (event) => {
     if (query.category) filter.category = query.category
     if (query.priority) filter.priority = query.priority
     
+    // Apply filters for new fields
+    if (query.company) filter.company = query.company
+    if (query.statusPhase) filter.statusPhase = query.statusPhase
+    if (query.responsiblePerson) filter.responsiblePerson = query.responsiblePerson
+    if (query.developer) filter.developers = query.developer
+    
     // Apply date range filters
     if (query.startAfter || query.endBefore) {
       filter.$and = []
       if (query.startAfter) filter.$and.push({ startDate: { $gte: query.startAfter } })
       if (query.endBefore) filter.$and.push({ endDate: { $lte: query.endBefore } })
+    }
+    
+    // Apply deadline filter
+    if (query.deadlineBefore) {
+      if (!filter.$and) filter.$and = []
+      filter.$and.push({ deadline: { $lte: query.deadlineBefore } })
     }
     
     // Get database connection

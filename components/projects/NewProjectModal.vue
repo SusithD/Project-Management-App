@@ -53,9 +53,9 @@ const handleCancel = () => {
       <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
         <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="handleCancel"></div>
         
-        <!-- Modal Content -->
+        <!-- Modal Content - Increased width from max-w-lg to max-w-7xl -->
         <div 
-          class="transform overflow-hidden rounded-lg bg-white px-6 pb-6 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg"
+          class="transform overflow-hidden rounded-lg bg-white px-6 pb-6 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-7xl mx-auto"
         >
           <div class="flex justify-between items-center border-b border-neutral-200 pb-4 mb-4">
             <h3 class="text-lg font-semibold text-neutral-800">Add New Project</h3>
@@ -67,11 +67,14 @@ const handleCancel = () => {
             </button>
           </div>
           
-          <ProjectForm
-            :is-submitting="isSubmitting"
-            @submit="handleSubmit"
-            @cancel="handleCancel"
-          />
+          <!-- The ProjectForm component with some additional padding -->
+          <div class="px-2">
+            <ProjectForm
+              :is-submitting="isSubmitting"
+              @submit="handleSubmit"
+              @cancel="handleCancel"
+            />
+          </div>
         </div>
       </div>
     </div>

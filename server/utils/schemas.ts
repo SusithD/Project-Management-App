@@ -34,6 +34,18 @@ export interface Project {
   team: string[];
   updates?: ProjectUpdate[];
   _id?: ObjectId;
+  
+  // New fields
+  company?: string;
+  statusPhase?: string;
+  deadline?: string;
+  comments?: string;
+  developers?: string[];
+  blockers?: string;
+  responsiblePerson?: string;
+  initiallyRaisedOn?: string;
+  pendingDays?: number | Int32;
+  feedbackForBlockers?: string;
 }
 
 // User interface
@@ -126,6 +138,50 @@ export const projectValidationSchema = {
             bsonType: 'string'
           },
           description: 'must be an array of strings'
+        },
+        // New fields
+        company: {
+          bsonType: 'string',
+          description: 'must be a string if present'
+        },
+        statusPhase: {
+          bsonType: 'string',
+          description: 'must be a string if present'
+        },
+        deadline: {
+          bsonType: 'string',
+          description: 'must be a string if present'
+        },
+        comments: {
+          bsonType: 'string',
+          description: 'must be a string if present'
+        },
+        developers: {
+          bsonType: 'array',
+          items: {
+            bsonType: 'string'
+          },
+          description: 'must be an array of strings if present'
+        },
+        blockers: {
+          bsonType: 'string',
+          description: 'must be a string if present'
+        },
+        responsiblePerson: {
+          bsonType: 'string',
+          description: 'must be a string if present'
+        },
+        initiallyRaisedOn: {
+          bsonType: 'string',
+          description: 'must be a date string if present'
+        },
+        pendingDays: {
+          bsonType: 'int',
+          description: 'must be an integer if present'
+        },
+        feedbackForBlockers: {
+          bsonType: 'string',
+          description: 'must be a string if present'
         },
         updates: {
           bsonType: 'array',
