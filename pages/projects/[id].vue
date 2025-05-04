@@ -492,102 +492,385 @@ onMounted(() => {
       
       <!-- Edit Form -->
       <div v-if="isEditing" class="bg-white rounded-lg shadow-card p-6 mb-6">
-        <h2 class="text-lg font-medium text-neutral-900 mb-4">Edit Project Details</h2>
+        <h2 class="text-lg font-semibold text-neutral-900 mb-4 flex items-center">
+          <span class="mdi mdi-pencil-outline text-lg text-primary-600 mr-2"></span>
+          Edit Project Details
+        </h2>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Project Name -->
-          <div>
-            <label for="project-name" class="block text-sm font-medium text-neutral-700 mb-1">Project Name</label>
-            <input 
-              id="project-name"
-              v-model="editedProject.name"
-              type="text"
-              class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            />
-          </div>
-          
-          <!-- Status -->
-          <div>
-            <label for="project-status" class="block text-sm font-medium text-neutral-700 mb-1">Status</label>
-            <select 
-              id="project-status"
-              v-model="editedProject.status"
-              class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            >
-              <option v-for="status in projectStatuses" :key="status" :value="status">{{ status }}</option>
-            </select>
-          </div>
-          
-          <!-- Start Date -->
-          <div>
-            <label for="project-start-date" class="block text-sm font-medium text-neutral-700 mb-1">Start Date</label>
-            <input 
-              id="project-start-date"
-              v-model="editedProject.startDate"
-              type="date"
-              class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            />
-          </div>
-          
-          <!-- End Date -->
-          <div>
-            <label for="project-end-date" class="block text-sm font-medium text-neutral-700 mb-1">End Date</label>
-            <input 
-              id="project-end-date"
-              v-model="editedProject.endDate"
-              type="date"
-              class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            />
-          </div>
-          
-          <!-- Progress -->
-          <div>
-            <label for="project-progress" class="block text-sm font-medium text-neutral-700 mb-1">Progress (%)</label>
-            <div class="flex items-center">
-              <input 
-                id="project-progress"
-                v-model.number="editedProject.progress"
-                type="number"
-                min="0"
-                max="100"
-                class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              />
-              <div class="ml-2">{{ editedProject.progress }}%</div>
+        <!-- Main Information -->
+        <div class="mb-8">
+          <h3 class="text-md font-medium text-neutral-800 mb-3 border-b border-neutral-200 pb-2">Basic Information</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Project Name -->
+            <div>
+              <label for="project-name" class="block text-sm font-medium text-neutral-700 mb-1">Project Name</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-folder-outline"></span>
+                </span>
+                <input 
+                  id="project-name"
+                  v-model="editedProject.name"
+                  type="text"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            
+            <!-- Company -->
+            <div>
+              <label for="project-company" class="block text-sm font-medium text-neutral-700 mb-1">Company</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-office-building"></span>
+                </span>
+                <input 
+                  id="project-company"
+                  v-model="editedProject.company"
+                  type="text"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            
+            <!-- Category -->
+            <div>
+              <label for="project-category" class="block text-sm font-medium text-neutral-700 mb-1">Category</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-shape-outline"></span>
+                </span>
+                <select 
+                  id="project-category"
+                  v-model="editedProject.category"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                >
+                  <option value="Development">Development</option>
+                  <option value="Design">Design</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Research">Research</option>
+                  <option value="Support">Support</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- Status -->
+            <div>
+              <label for="project-status" class="block text-sm font-medium text-neutral-700 mb-1">Status</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-check-circle-outline"></span>
+                </span>
+                <select 
+                  id="project-status"
+                  v-model="editedProject.status"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                >
+                  <option v-for="status in projectStatuses" :key="status" :value="status">{{ status }}</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- Status Phase -->
+            <div>
+              <label for="project-status-phase" class="block text-sm font-medium text-neutral-700 mb-1">Status Phase</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-playlist-check"></span>
+                </span>
+                <select 
+                  id="project-status-phase"
+                  v-model="editedProject.statusPhase"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                >
+                  <option value="">Select status phase</option>
+                  <option value="Planning">Planning</option>
+                  <option value="Development">Development</option>
+                  <option value="Testing">Testing</option>
+                  <option value="Deployment">Deployment</option>
+                  <option value="Maintenance">Maintenance</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- Priority -->
+            <div>
+              <label for="project-priority" class="block text-sm font-medium text-neutral-700 mb-1">Priority</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-flag"></span>
+                </span>
+                <select 
+                  id="project-priority"
+                  v-model="editedProject.priority"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Urgent">Urgent</option>
+                </select>
+              </div>
             </div>
           </div>
-          
-          <!-- Assigned To -->
-          <div>
-            <label for="project-assigned" class="block text-sm font-medium text-neutral-700 mb-1">Assigned To</label>
-            <input 
-              id="project-assigned"
-              v-model="editedProject.assignedTo"
-              type="text"
-              class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            />
+        </div>
+        
+        <!-- Timeline Information -->
+        <div class="mb-8">
+          <h3 class="text-md font-medium text-neutral-800 mb-3 border-b border-neutral-200 pb-2">Timeline Information</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Start Date -->
+            <div>
+              <label for="project-start-date" class="block text-sm font-medium text-neutral-700 mb-1">Start Date</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-calendar-start"></span>
+                </span>
+                <input 
+                  id="project-start-date"
+                  v-model="editedProject.startDate"
+                  type="date"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            
+            <!-- End Date -->
+            <div>
+              <label for="project-end-date" class="block text-sm font-medium text-neutral-700 mb-1">End Date</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-calendar-end"></span>
+                </span>
+                <input 
+                  id="project-end-date"
+                  v-model="editedProject.endDate"
+                  type="date"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            
+            <!-- Initially Raised On -->
+            <div>
+              <label for="project-raised-on" class="block text-sm font-medium text-neutral-700 mb-1">Initially Raised On</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-calendar-plus"></span>
+                </span>
+                <input 
+                  id="project-raised-on"
+                  v-model="editedProject.initiallyRaisedOn"
+                  type="date"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            
+            <!-- Deadline -->
+            <div>
+              <label for="project-deadline" class="block text-sm font-medium text-neutral-700 mb-1">Deadline</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-clock-alert-outline"></span>
+                </span>
+                <input 
+                  id="project-deadline"
+                  v-model="editedProject.deadline"
+                  type="date"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            
+            <!-- Progress -->
+            <div>
+              <label for="project-progress" class="block text-sm font-medium text-neutral-700 mb-1">Progress (%)</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-percent"></span>
+                </span>
+                <input 
+                  id="project-progress"
+                  v-model.number="editedProject.progress"
+                  type="number"
+                  min="0"
+                  max="100"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+                <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                  <span class="text-sm text-neutral-500">{{ editedProject.progress }}%</span>
+                </div>
+              </div>
+              <div class="mt-2 w-full bg-neutral-200 rounded-full h-2">
+                <div
+                  class="bg-primary-500 h-2 rounded-full transition-all duration-300"
+                  :style="`width: ${editedProject.progress}%`"
+                ></div>
+              </div>
+            </div>
+            
+            <!-- Pending Days -->
+            <div>
+              <label for="project-pending" class="block text-sm font-medium text-neutral-700 mb-1">Pending Days</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-calendar-clock"></span>
+                </span>
+                <input 
+                  id="project-pending"
+                  v-model.number="editedProject.pendingDays"
+                  type="number"
+                  min="0"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+                <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                  <span class="text-sm text-neutral-500">days</span>
+                </div>
+              </div>
+            </div>
           </div>
-          
-          <!-- Remarks - Full width -->
-          <div class="col-span-1 md:col-span-2">
-            <label for="project-remarks" class="block text-sm font-medium text-neutral-700 mb-1">Remarks</label>
-            <textarea 
-              id="project-remarks"
-              v-model="editedProject.remarks"
-              rows="3"
-              class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            ></textarea>
+        </div>
+        
+        <!-- Team Information -->
+        <div class="mb-8">
+          <h3 class="text-md font-medium text-neutral-800 mb-3 border-b border-neutral-200 pb-2">Team Information</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Assigned To -->
+            <div>
+              <label for="project-assigned" class="block text-sm font-medium text-neutral-700 mb-1">Project Lead</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-account"></span>
+                </span>
+                <input 
+                  id="project-assigned"
+                  v-model="editedProject.assignedTo"
+                  type="text"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            
+            <!-- Responsible Person -->
+            <div>
+              <label for="project-responsible" class="block text-sm font-medium text-neutral-700 mb-1">Responsible Person</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
+                  <span class="mdi mdi-account-star"></span>
+                </span>
+                <input 
+                  id="project-responsible"
+                  v-model="editedProject.responsiblePerson"
+                  type="text"
+                  placeholder="Person responsible for the project"
+                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+              </div>
+            </div>
           </div>
-          
-          <!-- Notes - Full width -->
-          <div class="col-span-1 md:col-span-2">
-            <label for="project-notes" class="block text-sm font-medium text-neutral-700 mb-1">Notes</label>
-            <textarea 
-              id="project-notes"
-              v-model="editedProject.notes"
-              rows="3"
-              class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            ></textarea>
+        </div>
+        
+        <!-- Project Description -->
+        <div class="mb-8">
+          <h3 class="text-md font-medium text-neutral-800 mb-3 border-b border-neutral-200 pb-2">Project Description</h3>
+          <div class="grid grid-cols-1 md:grid-cols-1 gap-4">
+            <!-- Remarks -->
+            <div>
+              <label for="project-remarks" class="block text-sm font-medium text-neutral-700 mb-1">Remarks</label>
+              <textarea 
+                id="project-remarks"
+                v-model="editedProject.remarks"
+                rows="3"
+                placeholder="Project remarks or description"
+                class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              ></textarea>
+            </div>
+            
+            <!-- Notes -->
+            <div>
+              <label for="project-notes" class="block text-sm font-medium text-neutral-700 mb-1">Notes</label>
+              <textarea 
+                id="project-notes"
+                v-model="editedProject.notes"
+                rows="3"
+                placeholder="Additional project notes"
+                class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              ></textarea>
+            </div>
+            
+            <!-- Comments -->
+            <div>
+              <label for="project-comments" class="block text-sm font-medium text-neutral-700 mb-1">Comments</label>
+              <textarea 
+                id="project-comments"
+                v-model="editedProject.comments"
+                rows="3"
+                placeholder="General project comments"
+                class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              ></textarea>
+            </div>
           </div>
+        </div>
+        
+        <!-- Blockers Information -->
+        <div class="mb-8">
+          <h3 class="text-md font-medium text-neutral-800 mb-3 border-b border-neutral-200 pb-2">Blockers & Feedback</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Blockers -->
+            <div>
+              <label for="project-blockers" class="block text-sm font-medium text-neutral-700 mb-1">Blockers</label>
+              <div class="relative">
+                <textarea 
+                  id="project-blockers"
+                  v-model="editedProject.blockers"
+                  rows="4"
+                  placeholder="List any blockers preventing progress..."
+                  class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                ></textarea>
+                <span class="absolute top-2 right-2 text-red-400 text-lg">
+                  <span class="mdi mdi-alert-circle"></span>
+                </span>
+              </div>
+            </div>
+            
+            <!-- Feedback for Blockers -->
+            <div>
+              <label for="project-feedback" class="block text-sm font-medium text-neutral-700 mb-1">Feedback for Blockers</label>
+              <div class="relative">
+                <textarea 
+                  id="project-feedback"
+                  v-model="editedProject.feedbackForBlockers"
+                  rows="4"
+                  placeholder="Add feedback about project blockers..."
+                  class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                ></textarea>
+                <span class="absolute top-2 right-2 text-primary-400 text-lg">
+                  <span class="mdi mdi-message-reply"></span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex justify-end gap-3">
+          <button 
+            @click="toggleEditMode" 
+            class="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md bg-white text-neutral-700 hover:bg-neutral-50"
+          >
+            <span class="mdi mdi-cancel text-lg mr-2"></span>
+            Cancel
+          </button>
+          
+          <button 
+            @click="saveProject" 
+            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md bg-success-600 text-white hover:bg-success-700 shadow-sm"
+          >
+            <span class="mdi mdi-content-save text-lg mr-2"></span>
+            Save Changes
+          </button>
         </div>
       </div>
       
@@ -711,61 +994,282 @@ onMounted(() => {
       <div v-if="activeTab === 'overview'" class="bg-white rounded-lg shadow-card p-6">
         <h2 class="text-lg font-medium text-neutral-900 mb-4">Project Details</h2>
         
-        <div class="mb-6">
-          <h3 class="text-md font-medium text-neutral-800 mb-2">Remarks</h3>
-          <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.remarks || 'No remarks provided' }}</p>
+        <!-- Main Info Cards with Animation -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <!-- Main Project Info -->
+          <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow-lg p-5 border-l-4 border-primary-500 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 class="text-md font-semibold text-neutral-900 mb-3">Basic Information</h3>
+                <div class="space-y-2">
+                  <div class="flex items-center">
+                    <span class="mdi mdi-office-building text-primary-600 mr-2"></span>
+                    <span class="text-sm text-neutral-600">Company:</span>
+                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.company || 'Not specified' }}</span>
+                  </div>
+                  <div class="flex items-center">
+                    <span class="mdi mdi-shape-outline text-primary-600 mr-2"></span>
+                    <span class="text-sm text-neutral-600">Category:</span>
+                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.category }}</span>
+                  </div>
+                  <div class="flex items-center">
+                    <span class="mdi mdi-flag text-primary-600 mr-2"></span>
+                    <span class="text-sm text-neutral-600">Priority:</span>
+                    <span :class="[
+                      'text-sm font-medium ml-2 px-2 py-0.5 rounded-full text-xs',
+                      project.priority === 'Urgent' ? 'bg-error-100 text-error-700' :
+                      project.priority === 'High' ? 'bg-warning-100 text-warning-700' :
+                      project.priority === 'Medium' ? 'bg-accent-100 text-accent-700' :
+                      'bg-success-100 text-success-700'
+                    ]">{{ project.priority }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center">
+                <span class="mdi mdi-information-outline text-xl text-primary-600"></span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Status Info -->
+          <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow-lg p-5 border-l-4 border-accent-500 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 class="text-md font-semibold text-neutral-900 mb-3">Status Details</h3>
+                <div class="space-y-2">
+                  <div class="flex items-center">
+                    <span class="mdi mdi-playlist-check text-accent-600 mr-2"></span>
+                    <span class="text-sm text-neutral-600">Status Phase:</span>
+                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.statusPhase || 'Not specified' }}</span>
+                  </div>
+                  <div class="flex items-center">
+                    <span class="mdi mdi-calendar-clock text-accent-600 mr-2"></span>
+                    <span class="text-sm text-neutral-600">Pending Days:</span>
+                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.pendingDays || 0 }} days</span>
+                  </div>
+                  <div class="flex items-center">
+                    <span class="mdi mdi-calendar-plus text-accent-600 mr-2"></span>
+                    <span class="text-sm text-neutral-600">Initially Raised:</span>
+                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.initiallyRaisedOn || project.startDate }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="h-12 w-12 rounded-full bg-accent-100 flex items-center justify-center">
+                <span class="mdi mdi-check-circle-outline text-xl text-accent-600"></span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Responsibility Info -->
+          <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow-lg p-5 border-l-4 border-success-500 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+            <div class="flex items-start justify-between">
+              <div>
+                <h3 class="text-md font-semibold text-neutral-900 mb-3">Responsibility</h3>
+                <div class="space-y-2">
+                  <div class="flex items-center">
+                    <span class="mdi mdi-account-star text-success-600 mr-2"></span>
+                    <span class="text-sm text-neutral-600">Responsible Person:</span>
+                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.responsiblePerson || project.assignedTo }}</span>
+                  </div>
+                  <div class="flex items-center">
+                    <span class="mdi mdi-laptop text-success-600 mr-2"></span>
+                    <span class="text-sm text-neutral-600">Developers:</span>
+                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.developers ? project.developers.length : 0 }} assigned</span>
+                  </div>
+                  <div class="flex items-center">
+                    <span class="mdi mdi-clock-alert-outline text-success-600 mr-2"></span>
+                    <span class="text-sm text-neutral-600">Deadline:</span>
+                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.deadline || project.endDate }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="h-12 w-12 rounded-full bg-success-100 flex items-center justify-center">
+                <span class="mdi mdi-account-group text-xl text-success-600"></span>
+              </div>
+            </div>
+          </div>
         </div>
         
-        <div class="mb-6">
-          <h3 class="text-md font-medium text-neutral-800 mb-2">Notes</h3>
-          <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.notes || 'No notes provided' }}</p>
+        <!-- Project Description Details -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transition-all duration-300 hover:shadow-lg">
+            <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
+              <span class="mdi mdi-message-text-outline text-lg text-primary-600 mr-2"></span>
+              Remarks
+            </h3>
+            <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.remarks || 'No remarks provided' }}</p>
+          </div>
+          
+          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transition-all duration-300 hover:shadow-lg">
+            <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
+              <span class="mdi mdi-clipboard-text-outline text-lg text-primary-600 mr-2"></span>
+              Notes
+            </h3>
+            <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.notes || 'No notes provided' }}</p>
+          </div>
         </div>
         
-        <div>
-          <h3 class="text-md font-medium text-neutral-800 mb-2">Project Information</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-neutral-50 p-3 rounded-md">
-              <div class="flex justify-between mb-1">
-                <span class="text-neutral-600">Status:</span>
-                <span class="font-medium text-neutral-900">{{ project.status }}</span>
+        <!-- Blockers & Feedback -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transition-all duration-300 hover:shadow-lg">
+            <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
+              <span class="mdi mdi-alert-circle text-lg text-error-600 mr-2"></span>
+              Blockers
+            </h3>
+            <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.blockers || 'No blockers reported' }}</p>
+          </div>
+          
+          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transition-all duration-300 hover:shadow-lg">
+            <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
+              <span class="mdi mdi-message-reply text-lg text-accent-600 mr-2"></span>
+              Feedback on Blockers
+            </h3>
+            <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.feedbackForBlockers || 'No feedback provided' }}</p>
+          </div>
+        </div>
+        
+        <!-- Comments -->
+        <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transition-all duration-300 hover:shadow-lg">
+          <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
+            <span class="mdi mdi-message-processing-outline text-lg text-primary-600 mr-2"></span>
+            Comments
+          </h3>
+          <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.comments || 'No comments added' }}</p>
+        </div>
+        
+        <!-- Team Information Section -->
+        <div class="mt-8">
+          <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
+            <span class="mdi mdi-account-group text-lg text-primary-600 mr-2"></span>
+            Team Information
+          </h3>
+          
+          <!-- Team Members -->
+          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 mt-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 class="text-sm font-medium text-neutral-600 mb-2">Lead & Assignee</h4>
+                <div class="bg-neutral-50 p-4 rounded-lg">
+                  <div class="flex items-center mb-3">
+                    <div class="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+                      <span class="mdi mdi-account text-xl text-primary-600"></span>
+                    </div>
+                    <div>
+                      <div class="text-sm font-medium text-neutral-900">{{ project.assignedTo }}</div>
+                      <div class="text-xs text-neutral-500">Project Lead</div>
+                    </div>
+                  </div>
+                  
+                  <div v-if="project.responsiblePerson && project.responsiblePerson !== project.assignedTo" class="flex items-center">
+                    <div class="h-10 w-10 rounded-full bg-accent-100 flex items-center justify-center mr-3">
+                      <span class="mdi mdi-account-star text-xl text-accent-600"></span>
+                    </div>
+                    <div>
+                      <div class="text-sm font-medium text-neutral-900">{{ project.responsiblePerson }}</div>
+                      <div class="text-xs text-neutral-500">Responsible Person</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="flex justify-between mb-1">
-                <span class="text-neutral-600">Progress:</span>
-                <span class="font-medium text-neutral-900">{{ project.progress }}%</span>
-              </div>
-              <div class="flex justify-between mb-1">
-                <span class="text-neutral-600">Assigned To:</span>
-                <span class="font-medium text-neutral-900">{{ project.assignedTo }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-neutral-600">Team Size:</span>
-                <span class="font-medium text-neutral-900">{{ project.team?.length || 0 }} members</span>
+              
+              <div>
+                <h4 class="text-sm font-medium text-neutral-600 mb-2">Team Members</h4>
+                <div class="bg-neutral-50 p-4 rounded-lg">
+                  <div v-if="project.team && project.team.length" class="flex flex-wrap gap-2">
+                    <div v-for="(member, index) in project.team" :key="index" 
+                      class="px-3 py-1 bg-white rounded-full border border-neutral-200 text-sm flex items-center">
+                      <span class="mdi mdi-account text-xs text-neutral-500 mr-1"></span>
+                      {{ member }}
+                    </div>
+                  </div>
+                  <div v-else class="text-sm text-neutral-500 italic">No team members assigned</div>
+                </div>
               </div>
             </div>
             
-            <div class="bg-neutral-50 p-3 rounded-md">
-              <div class="flex justify-between mb-1">
-                <span class="text-neutral-600">Start Date:</span>
-                <span class="font-medium text-neutral-900">{{ project.startDate }}</span>
+            <!-- Developers Section -->
+            <div v-if="project.developers && project.developers.length" class="mt-4">
+              <h4 class="text-sm font-medium text-neutral-600 mb-2">Developers</h4>
+              <div class="bg-neutral-50 p-4 rounded-lg">
+                <div class="flex flex-wrap gap-2">
+                  <div v-for="(dev, index) in project.developers" :key="index"
+                    class="px-3 py-1 bg-white rounded-full border border-neutral-200 text-sm flex items-center">
+                    <span class="mdi mdi-laptop text-xs text-neutral-500 mr-1"></span>
+                    {{ dev }}
+                  </div>
+                </div>
               </div>
-              <div class="flex justify-between mb-1">
-                <span class="text-neutral-600">End Date:</span>
-                <span class="font-medium text-neutral-900">{{ project.endDate }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Timeline Section -->
+        <div class="mt-8">
+          <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
+            <span class="mdi mdi-calendar-range text-lg text-primary-600 mr-2"></span>
+            Timeline Information
+          </h3>
+          
+          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 mt-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- Timeline Visualization -->
+              <div class="md:col-span-3">
+                <div class="relative pt-6 pb-2">
+                  <div class="absolute left-0 right-0 top-0 flex justify-between px-6">
+                    <div class="text-xs text-neutral-500">Start</div>
+                    <div class="text-xs text-neutral-500">End</div>
+                  </div>
+                  <div class="h-3 bg-neutral-100 rounded-full overflow-hidden relative">
+                    <div
+                      class="absolute h-full bg-primary-500 rounded-full"
+                      :style="{
+                        width: isOverdue ? '100%' : `${project.progress}%`,
+                        backgroundColor: isOverdue ? 'var(--color-error-600)' : undefined
+                      }"
+                    ></div>
+                  </div>
+                  <div class="flex justify-between mt-2">
+                    <div class="text-xs font-medium">{{ project.startDate }}</div>
+                    <div :class="['text-xs font-medium', isOverdue ? 'text-error-600' : '']">
+                      {{ project.endDate }}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="flex justify-between mb-1">
-                <span class="text-neutral-600">Days Remaining:</span>
-                <span 
-                  :class="[
-                    'font-medium',
-                    isOverdue ? 'text-error-600' : 'text-neutral-900'
-                  ]"
-                >
-                  {{ isOverdue ? `${Math.abs(daysRemaining)} days overdue` : `${daysRemaining} days` }}
-                </span>
+              
+              <!-- Date Information -->
+              <div class="bg-neutral-50 p-4 rounded-lg flex flex-col justify-between">
+                <h4 class="text-sm font-medium text-neutral-600 mb-2">Project Start</h4>
+                <div>
+                  <div class="text-md font-bold text-neutral-800">{{ project.startDate }}</div>
+                  <div class="text-xs text-neutral-500 mt-1">Initially Raised: {{ project.initiallyRaisedOn || project.startDate }}</div>
+                </div>
               </div>
-              <div class="flex justify-between">
-                <span class="text-neutral-600">Last Updated:</span>
-                <span class="font-medium text-neutral-900">{{ project.lastUpdated }}</span>
+              
+              <div class="bg-neutral-50 p-4 rounded-lg flex flex-col justify-between">
+                <h4 class="text-sm font-medium text-neutral-600 mb-2">Project Deadline</h4>
+                <div>
+                  <div :class="['text-md font-bold', isOverdue ? 'text-error-700' : 'text-neutral-800']">
+                    {{ project.deadline || project.endDate }}
+                  </div>
+                  <div class="text-xs text-neutral-500 mt-1">Expected End Date: {{ project.endDate }}</div>
+                </div>
+              </div>
+              
+              <div class="bg-neutral-50 p-4 rounded-lg flex flex-col justify-between">
+                <h4 class="text-sm font-medium text-neutral-600 mb-2">Time Tracking</h4>
+                <div class="flex items-center">
+                  <div class="text-2xl font-bold mr-2" :class="[isOverdue ? 'text-error-600' : 'text-success-600']">
+                    {{ Math.abs(daysRemaining) }}
+                  </div>
+                  <div :class="[
+                    'text-sm px-2 py-1 rounded-full',
+                    isOverdue ? 'bg-error-100 text-error-800' : 'bg-success-100 text-success-800'
+                  ]">
+                    {{ isOverdue ? 'Days Overdue' : 'Days Remaining' }}
+                  </div>
+                </div>
+                <div class="text-xs text-neutral-500 mt-2">Pending: {{ project.pendingDays || 0 }} days</div>
               </div>
             </div>
           </div>
