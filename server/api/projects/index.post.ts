@@ -1,10 +1,20 @@
-// POST endpoint to create a new project
 import { Int32 } from 'mongodb'
 import { connectToDatabase } from '~/server/utils/database'
 import { COLLECTIONS, Project } from '~/server/utils/schemas'
+// Import auth from Nuxt
+import { useRuntimeConfig } from '#imports'
 
 export default defineEventHandler(async (event) => {
   try {
+    // Check authentication using headers instead of getServerSession
+    const authHeader = getRequestHeader(event, 'Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw createError({
+        statusCode: 401,
+        message: 'Unauthorized'
+      });
+    }
+
     // Parse request body
     const body = await readBody(event)
     
@@ -46,7 +56,13 @@ export default defineEventHandler(async (event) => {
       responsiblePerson: body.responsiblePerson || '',
       initiallyRaisedOn: body.initiallyRaisedOn || currentDate,
       pendingDays: new Int32(parseInt(body.pendingDays) || 0),
-      feedbackForBlockers: body.feedbackForBlockers || ''
+      feedbackForBlockers: body.feedbackForBlockers || '',
+      createdBy: body.userEmail || 'unknown',
+      externalLinks: {
+        githubRepo: body.externalLinks?.githubRepo || '',
+        figmaLink: body.externalLinks?.figmaLink || '',
+        jiraProject: body.externalLinks?.jiraProject || ''
+      }
     }
     
     // Insert the new project
