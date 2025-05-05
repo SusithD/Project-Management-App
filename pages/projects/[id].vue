@@ -68,6 +68,14 @@ const formattedTeamData = computed(() => {
   };
 });
 
+// Function to get user name from user ID
+const getUserName = (userId) => {
+  if (!userId) return 'Not assigned';
+  
+  const user = usersStore.users.find(user => user.id === userId);
+  return user ? user.name : userId; // Return name if found, otherwise return ID as fallback
+};
+
 // Fetch project data from API
 const fetchProject = async () => {
   isLoading.value = true;
@@ -949,7 +957,7 @@ const hasExternalLinks = computed(() => {
                       <span class="mdi mdi-account text-lg"></span>
                     </div>
                     <div class="flex-1 min-w-0">
-                      <div class="font-medium truncate">{{ typeof memberId === 'string' ? memberId : '(Unknown)' }}</div>
+                      <div class="font-medium truncate">{{ getUserName(memberId) }}</div>
                     </div>
                     <button 
                       type="button" 
@@ -1011,7 +1019,7 @@ const hasExternalLinks = computed(() => {
                       <span class="mdi mdi-laptop text-lg"></span>
                     </div>
                     <div class="flex-1 min-w-0">
-                      <div class="font-medium truncate">{{ typeof devId === 'string' ? devId : '(Unknown)' }}</div>
+                      <div class="font-medium truncate">{{ getUserName(devId) }}</div>
                     </div>
                     <button 
                       type="button" 
@@ -1457,13 +1465,13 @@ const hasExternalLinks = computed(() => {
           <h3 class="text-sm font-medium text-neutral-500 mb-2">Team</h3>
           <div class="flex items-center mb-3">
             <div class="text-lg font-medium text-neutral-900 mr-2">Assigned to:</div>
-            <div class="text-lg text-neutral-800">{{ project.assignedTo }}</div>
+            <div class="text-lg text-neutral-800">{{ getUserName(project.assignedTo) }}</div>
           </div>
           <div v-if="project.team && project.team.length" class="text-sm text-neutral-600">
             <div class="font-medium mb-1">Team Members:</div>
             <div v-for="(member, index) in project.team" :key="index" class="flex items-center mb-1">
               <span class="mdi mdi-account text-lg mr-2 text-neutral-500"></span>
-              {{ member }}
+              {{ getUserName(member) }}
             </div>
           </div>
           <div v-else class="text-neutral-600 text-sm italic">No team members assigned</div>
@@ -1768,7 +1776,7 @@ const hasExternalLinks = computed(() => {
                       <span class="mdi mdi-account text-xl text-primary-600"></span>
                     </div>
                     <div>
-                      <div class="text-sm font-medium text-neutral-900">{{ project.assignedTo }}</div>
+                      <div class="text-sm font-medium text-neutral-900">{{ getUserName(project.assignedTo) }}</div>
                       <div class="text-xs text-neutral-500">Project Lead</div>
                     </div>
                   </div>
@@ -1778,7 +1786,7 @@ const hasExternalLinks = computed(() => {
                       <span class="mdi mdi-account-star text-xl text-accent-600"></span>
                     </div>
                     <div>
-                      <div class="text-sm font-medium text-neutral-900">{{ project.responsiblePerson }}</div>
+                      <div class="text-sm font-medium text-neutral-900">{{ getUserName(project.responsiblePerson) }}</div>
                       <div class="text-xs text-neutral-500">Responsible Person</div>
                     </div>
                   </div>
@@ -1792,7 +1800,7 @@ const hasExternalLinks = computed(() => {
                     <div v-for="(member, index) in project.team" :key="index" 
                       class="px-3 py-1 bg-white rounded-full border border-neutral-200 text-sm flex items-center">
                       <span class="mdi mdi-account text-xs text-neutral-500 mr-1"></span>
-                      {{ member }}
+                      {{ getUserName(member) }}
                     </div>
                   </div>
                   <div v-else class="text-sm text-neutral-500 italic">No team members assigned</div>
@@ -1808,7 +1816,7 @@ const hasExternalLinks = computed(() => {
                   <div v-for="(dev, index) in project.developers" :key="index"
                     class="px-3 py-1 bg-white rounded-full border border-neutral-200 text-sm flex items-center">
                     <span class="mdi mdi-laptop text-xs text-neutral-500 mr-1"></span>
-                    {{ dev }}
+                    {{ getUserName(dev) }}
                   </div>
                 </div>
               </div>
@@ -2108,7 +2116,7 @@ const hasExternalLinks = computed(() => {
                   <span class="mdi mdi-account-tie text-2xl text-primary-600"></span>
                 </div>
                 <div class="ml-4">
-                  <h4 class="font-medium text-neutral-900">{{ project.assignedTo || 'No project lead assigned' }}</h4>
+                  <h4 class="font-medium text-neutral-900">{{ getUserName(project.assignedTo) || 'No project lead assigned' }}</h4>
                   <div class="flex items-center mt-1">
                     <span class="bg-primary-100 text-primary-800 text-xs px-2 py-0.5 rounded-full">Project Lead</span>
                   </div>
@@ -2127,7 +2135,7 @@ const hasExternalLinks = computed(() => {
                   <span class="mdi mdi-account-star text-2xl text-accent-600"></span>
                 </div>
                 <div class="ml-4">
-                  <h4 class="font-medium text-neutral-900">{{ project.responsiblePerson || 'Not assigned' }}</h4>
+                  <h4 class="font-medium text-neutral-900">{{ getUserName(project.responsiblePerson) || 'Not assigned' }}</h4>
                   <div class="flex items-center mt-1">
                     <span class="bg-accent-100 text-accent-800 text-xs px-2 py-0.5 rounded-full">Responsible Person</span>
                   </div>
@@ -2168,7 +2176,7 @@ const hasExternalLinks = computed(() => {
                   <span class="mdi mdi-account text-xl text-neutral-600"></span>
                 </div>
                 <div class="ml-3 flex-1 min-w-0">
-                  <div class="font-medium text-neutral-900 truncate">{{ member }}</div>
+                  <div class="font-medium text-neutral-900 truncate">{{ getUserName(member) }}</div>
                   <div class="text-xs text-neutral-500 mt-1">Team Member</div>
                 </div>
                 <div v-if="canEdit && isEditing" 
@@ -2214,7 +2222,7 @@ const hasExternalLinks = computed(() => {
                   <span class="mdi mdi-laptop text-xl text-success-600"></span>
                 </div>
                 <div class="ml-3 flex-1 min-w-0">
-                  <div class="font-medium text-neutral-900 truncate">{{ developer }}</div>
+                  <div class="font-medium text-neutral-900 truncate">{{ getUserName(developer) }}</div>
                   <div class="text-xs text-neutral-500 mt-1">Developer</div>
                 </div>
                 <div v-if="canEdit && isEditing" 
