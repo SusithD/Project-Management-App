@@ -65,10 +65,12 @@ export interface Project {
 // User interface
 export interface User {
   _id?: ObjectId;
-  email: string;
+  id: string;
   name: string;
+  email: string;
   role: string;
-  createdAt: string;
+  avatar: string | null;
+  createdAt?: string;
 }
 
 // File interface
@@ -261,6 +263,42 @@ export const projectValidationSchema = {
               }
             }
           }
+        }
+      }
+    }
+  }
+};
+
+// User validation schema
+export const userValidationSchema = {
+  validator: {
+    $jsonSchema: {
+      bsonType: 'object',
+      required: ['id', 'name', 'email', 'role'],
+      properties: {
+        id: {
+          bsonType: 'string',
+          description: 'must be a string and is required'
+        },
+        name: {
+          bsonType: 'string',
+          description: 'must be a string and is required'
+        },
+        email: {
+          bsonType: 'string',
+          description: 'must be a string and is required'
+        },
+        role: {
+          bsonType: 'string',
+          description: 'must be a string and is required'
+        },
+        avatar: {
+          bsonType: ['string', 'null'],
+          description: 'must be a string or null'
+        },
+        createdAt: {
+          bsonType: 'string',
+          description: 'must be a date string'
         }
       }
     }

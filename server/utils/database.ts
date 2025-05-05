@@ -1,5 +1,5 @@
 import { MongoClient, Db } from 'mongodb'
-import { COLLECTIONS, projectValidationSchema } from '~/server/utils/schemas'
+import { COLLECTIONS, projectValidationSchema, userValidationSchema } from '~/server/utils/schemas'
 import { useRuntimeConfig } from '#imports'
 
 // Singleton connection variables
@@ -72,8 +72,8 @@ async function setupCollections(db: Db) {
     
     // Setup users collection
     if (!collectionNames.includes(COLLECTIONS.USERS)) {
-      await db.createCollection(COLLECTIONS.USERS)
-      console.log(`Created ${COLLECTIONS.USERS} collection`)
+      await db.createCollection(COLLECTIONS.USERS, userValidationSchema)
+      console.log(`Created ${COLLECTIONS.USERS} collection with validation`)
       await db.collection(COLLECTIONS.USERS).createIndex({ email: 1 }, { unique: true })
     }
     
