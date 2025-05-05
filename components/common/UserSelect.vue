@@ -39,6 +39,20 @@ const isOpen = ref(false);
 const searchQuery = ref('');
 const selectedUsers = ref(props.multiple ? [...(Array.isArray(props.modelValue) ? props.modelValue : [])] : props.modelValue);
 
+// Ensure users are loaded when the component is mounted
+onMounted(async () => {
+  if (usersStore.users.length === 0) {
+    try {
+      await usersStore.fetchUsers();
+      console.log('UserSelect: Successfully loaded users:', usersStore.users.length);
+    } catch (error) {
+      console.error('UserSelect: Error loading users:', error);
+    }
+  } else {
+    console.log('UserSelect: Already have users loaded:', usersStore.users.length);
+  }
+});
+
 // Filtered users based on search query and role filter
 const filteredUsers = computed(() => {
   let users = usersStore.users;

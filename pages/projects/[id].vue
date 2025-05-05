@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
 import { useNotificationsStore } from '~/stores/notifications';
+import { useUsersStore } from '~/stores/users'; // Add this line to import users store
 
 // Import the UserSelect component
 import UserSelect from '~/components/common/UserSelect.vue';
@@ -19,6 +20,7 @@ const isLoading = ref(true);
 const project = ref(null);
 const authStore = useAuthStore();
 const notificationsStore = useNotificationsStore();
+const usersStore = useUsersStore(); // Initialize the users store
 const error = ref(null);
 // Store the MongoDB ObjectId once we have it
 const mongoObjectId = ref(null);
@@ -479,7 +481,16 @@ const canEdit = computed(() => {
 const activeTab = ref('overview');
 
 // Load project data on mount
-onMounted(() => {
+onMounted(async () => {
+  // Make sure users are loaded first, so they're available for the UserSelect components
+  try {
+    await usersStore.fetchUsers();
+    console.log('Users loaded successfully:', usersStore.users.length);
+  } catch (error) {
+    console.error('Error loading users:', error);
+  }
+  
+  // Then fetch the project
   fetchProject();
 });
 
