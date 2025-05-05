@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useProjectsStore } from '~/stores/projects';
 import { useNotificationsStore } from '~/stores/notifications';
 import NewProjectModal from '~/components/projects/NewProjectModal.vue';
@@ -12,7 +12,6 @@ definePageMeta({
 // Get projects from store
 const projectsStore = useProjectsStore();
 const notificationsStore = useNotificationsStore();
-const notify = inject('notify'); // Use the notification plugin
 const isNewProjectModalOpen = ref(false);
 const isLoading = ref(true);
 
@@ -58,18 +57,18 @@ const filteredProjects = computed(() => {
 // Handle export to Excel
 const exportToExcel = () => {
   // In a real app, this would use xlsx or similar library to generate Excel file
-  notify.info('Preparing Excel export...', { timeout: 2000 });
+  notificationsStore.info('Preparing Excel export...', { timeout: 2000 });
   
   // Simulate export process
   setTimeout(() => {
-    notify.success('Export completed! Your Excel file is ready.', {
+    notificationsStore.success('Export completed! Your Excel file is ready.', {
       actions: [
         {
           text: 'Download',
           primary: true,
           onClick: () => {
             // Download logic would go here
-            notify.info('Excel file downloaded successfully');
+            notificationsStore.info('Excel file downloaded successfully');
           }
         }
       ]
@@ -80,18 +79,18 @@ const exportToExcel = () => {
 // Handle export to PDF
 const exportToPDF = () => {
   // In a real app, this would use jspdf or similar library to generate PDF
-  notify.info('Preparing PDF export...', { timeout: 2000 });
+  notificationsStore.info('Preparing PDF export...', { timeout: 2000 });
   
   // Simulate export process
   setTimeout(() => {
-    notify.success('Export completed! Your PDF is ready.', {
+    notificationsStore.success('Export completed! Your PDF is ready.', {
       actions: [
         {
           text: 'Download',
           primary: true,
           onClick: () => {
             // Download logic would go here
-            notify.info('PDF file downloaded successfully');
+            notificationsStore.info('PDF file downloaded successfully');
           }
         }
       ]
@@ -101,8 +100,8 @@ const exportToPDF = () => {
 
 // Delete project with confirmation
 const deleteProject = async (project) => {
-  // Use confirmation notification
-  const confirmed = await notify.confirm(
+  // Use confirmation from notificationsStore instead of injected notify
+  const confirmed = await notificationsStore.confirm(
     `Are you sure you want to delete "${project.name}"?`,
     {
       confirmText: 'Delete',
@@ -113,10 +112,12 @@ const deleteProject = async (project) => {
   
   if (confirmed) {
     try {
-      await projectsStore.deleteProject(project.id);
-      notify.success(`Project "${project.name}" was deleted successfully`);
+      // Use MongoDB _id if available, otherwise fall back to numeric id
+      const projectId = project._id || project.id;
+      await projectsStore.deleteProject(projectId);
+      notificationsStore.success(`Project "${project.name}" was deleted successfully`);
     } catch (error) {
-      notify.error(`Failed to delete project: ${error.message}`);
+      notificationsStore.error(`Failed to delete project: ${error.message}`);
     }
   }
 };
@@ -137,7 +138,7 @@ const clearFilters = () => {
   statusFilter.value = 'all';
   assigneeFilter.value = 'all';
   
-  notify.info('Filters have been cleared', { timeout: 2000 });
+  notificationsStore.info('Filters have been cleared', { timeout: 2000 });
 };
 </script>
 

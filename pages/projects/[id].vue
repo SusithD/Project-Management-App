@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
 import { useNotificationsStore } from '~/stores/notifications';
 
+// Import the UserSelect component
+import UserSelect from '~/components/common/UserSelect.vue';
+
 // Define layout
 definePageMeta({
   layout: 'dashboard'
@@ -35,6 +38,34 @@ const isEditing = ref(false);
 const editedProject = ref(null);
 const projectStatuses = ['Not Started', 'Ongoing', 'On Hold', 'Completed', 'Cancelled'];
 
+// Add a computed property to determine if we're in edit mode with data
+const hasExistingTeamMembers = computed(() => 
+  editedProject.value && editedProject.value.team && editedProject.value.team.length > 0
+);
+
+const hasExistingDevelopers = computed(() => 
+  editedProject.value && editedProject.value.developers && editedProject.value.developers.length > 0
+);
+
+// Get formatted team data for display
+const formattedTeamData = computed(() => {
+  if (!project.value) return { total: 0, members: 0, developers: 0, leadership: 0 };
+  
+  const leadCount = 
+    (project.value.assignedTo ? 1 : 0) + 
+    (project.value.responsiblePerson && project.value.responsiblePerson !== project.value.assignedTo ? 1 : 0);
+  
+  const members = project.value.team ? project.value.team.length : 0;
+  const developers = project.value.developers ? project.value.developers.length : 0;
+  
+  return {
+    total: leadCount + members + developers,
+    members,
+    developers,
+    leadership: leadCount
+  };
+});
+
 // Fetch project data from API
 const fetchProject = async () => {
   isLoading.value = true;
@@ -54,6 +85,15 @@ const fetchProject = async () => {
     
     // Save the MongoDB ObjectId for future API calls
     mongoObjectId.value = data._id;
+    
+    // Add default empty values for external links if they don't exist
+    if (!project.value.externalLinks) {
+      project.value.externalLinks = {
+        githubRepo: '',
+        figmaLink: '',
+        jiraProject: ''
+      };
+    }
     
     // Initialize edit form with project data
     editedProject.value = { ...data };
@@ -336,6 +376,17 @@ const saveProject = async () => {
       throw new Error("No valid MongoDB ID available");
     }
     
+    // Ensure externalLinks object exists before saving
+    if (!editedProject.value.externalLinks) {
+      editedProject.value.externalLinks = {
+        githubRepo: '',
+        figmaLink: '',
+        jiraProject: ''
+      };
+    }
+    
+    console.log('Saving project with external links:', editedProject.value.externalLinks);
+    
     // API call to update the project
     const response = await fetch(`/api/projects/${idToUse}`, {
       method: 'PUT',
@@ -431,6 +482,37 @@ const activeTab = ref('overview');
 onMounted(() => {
   fetchProject();
 });
+
+// Function to check if a URL is valid
+const isValidUrl = (url) => {
+  if (!url) return true; // Empty URLs are considered valid
+  try {
+    new URL(url);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+// Function to open external link with validation
+const openExternalLink = (url) => {
+  if (!url) return;
+  
+  // Add https:// if protocol is missing
+  let finalUrl = url;
+  if (!/^https?:\/\//i.test(finalUrl)) {
+    finalUrl = 'https://' + finalUrl;
+  }
+  
+  window.open(finalUrl, '_blank');
+};
+
+// Compute if we have any external links
+const hasExternalLinks = computed(() => {
+  if (!project.value?.externalLinks) return false;
+  const { githubRepo, figmaLink, jiraProject } = project.value.externalLinks;
+  return !!(githubRepo || figmaLink || jiraProject);
+});
 </script>
 
 <template>
@@ -523,384 +605,780 @@ onMounted(() => {
       
       <!-- Edit Form -->
       <div v-if="isEditing" class="bg-white rounded-lg shadow-card p-6 mb-6">
-        <h2 class="text-lg font-semibold text-neutral-900 mb-4 flex items-center">
-          <span class="mdi mdi-pencil-outline text-lg text-primary-600 mr-2"></span>
+        <h2 class="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+          <span class="mdi mdi-pencil-outline text-xl text-primary-600"></span>
           Edit Project Details
         </h2>
         
-        <!-- Main Information -->
-        <div class="mb-8">
-          <h3 class="text-md font-medium text-neutral-800 mb-3 border-b border-neutral-200 pb-2">Basic Information</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Project Name -->
-            <div>
-              <label for="project-name" class="block text-sm font-medium text-neutral-700 mb-1">Project Name</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-folder-outline"></span>
-                </span>
-                <input 
-                  id="project-name"
-                  v-model="editedProject.name"
-                  type="text"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-            
-            <!-- Company -->
-            <div>
-              <label for="project-company" class="block text-sm font-medium text-neutral-700 mb-1">Company</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-office-building"></span>
-                </span>
-                <input 
-                  id="project-company"
-                  v-model="editedProject.company"
-                  type="text"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-            
-            <!-- Category -->
-            <div>
-              <label for="project-category" class="block text-sm font-medium text-neutral-700 mb-1">Category</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-shape-outline"></span>
-                </span>
-                <select 
-                  id="project-category"
-                  v-model="editedProject.category"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                >
-                  <option value="Development">Development</option>
-                  <option value="Design">Design</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Research">Research</option>
-                  <option value="Support">Support</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </div>
-            
-            <!-- Status -->
-            <div>
-              <label for="project-status" class="block text-sm font-medium text-neutral-700 mb-1">Status</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-check-circle-outline"></span>
-                </span>
-                <select 
-                  id="project-status"
-                  v-model="editedProject.status"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                >
-                  <option v-for="status in projectStatuses" :key="status" :value="status">{{ status }}</option>
-                </select>
-              </div>
-            </div>
-            
-            <!-- Status Phase -->
-            <div>
-              <label for="project-status-phase" class="block text-sm font-medium text-neutral-700 mb-1">Status Phase</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-playlist-check"></span>
-                </span>
-                <select 
-                  id="project-status-phase"
-                  v-model="editedProject.statusPhase"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                >
-                  <option value="">Select status phase</option>
-                  <option value="Planning">Planning</option>
-                  <option value="Development">Development</option>
-                  <option value="Testing">Testing</option>
-                  <option value="Deployment">Deployment</option>
-                  <option value="Maintenance">Maintenance</option>
-                </select>
-              </div>
-            </div>
-            
-            <!-- Priority -->
-            <div>
-              <label for="project-priority" class="block text-sm font-medium text-neutral-700 mb-1">Priority</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-flag"></span>
-                </span>
-                <select 
-                  id="project-priority"
-                  v-model="editedProject.priority"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                  <option value="Urgent">Urgent</option>
-                </select>
-              </div>
-            </div>
-          </div>
+        <!-- Navigation tabs for edit sections -->
+        <div class="mb-6 border-b border-neutral-200">
+          <nav class="flex -mb-px overflow-x-auto" aria-label="Edit sections">
+            <button
+              type="button"
+              @click="activeTab = 'basic'"
+              :class="[
+                'mr-8 py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
+                activeTab === 'basic' 
+                  ? 'border-primary-600 text-primary-600' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+              ]"
+            >
+              <span class="mdi mdi-information-outline mr-1"></span>
+              Basic Information
+            </button>
+            <button
+              type="button"
+              @click="activeTab = 'team'"
+              :class="[
+                'mr-8 py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
+                activeTab === 'team' 
+                  ? 'border-primary-600 text-primary-600' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+              ]"
+            >
+              <span class="mdi mdi-account-group mr-1"></span>
+              Team Members
+            </button>
+            <button
+              type="button"
+              @click="activeTab = 'timeline'"
+              :class="[
+                'mr-8 py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
+                activeTab === 'timeline' 
+                  ? 'border-primary-600 text-primary-600' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+              ]"
+            >
+              <span class="mdi mdi-calendar-range mr-1"></span>
+              Timeline
+            </button>
+            <button
+              type="button"
+              @click="activeTab = 'details'"
+              :class="[
+                'mr-8 py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
+                activeTab === 'details' 
+                  ? 'border-primary-600 text-primary-600' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+              ]"
+            >
+              <span class="mdi mdi-text-box-outline mr-1"></span>
+              Additional Details
+            </button>
+            <button
+              type="button"
+              @click="activeTab = 'blockers'"
+              :class="[
+                'mr-8 py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
+                activeTab === 'blockers' 
+                  ? 'border-primary-600 text-primary-600' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+              ]"
+            >
+              <span class="mdi mdi-alert-circle-outline mr-1"></span>
+              Blockers & Feedback
+            </button>
+            <button
+              type="button"
+              @click="activeTab = 'links'"
+              :class="[
+                'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
+                activeTab === 'links' 
+                  ? 'border-primary-600 text-primary-600' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+              ]"
+            >
+              <span class="mdi mdi-link-variant mr-1"></span>
+              External Links
+            </button>
+          </nav>
         </div>
         
-        <!-- Timeline Information -->
-        <div class="mb-8">
-          <h3 class="text-md font-medium text-neutral-800 mb-3 border-b border-neutral-200 pb-2">Timeline Information</h3>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- Start Date -->
-            <div>
-              <label for="project-start-date" class="block text-sm font-medium text-neutral-700 mb-1">Start Date</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-calendar-start"></span>
-                </span>
-                <input 
-                  id="project-start-date"
-                  v-model="editedProject.startDate"
-                  type="date"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-            
-            <!-- End Date -->
-            <div>
-              <label for="project-end-date" class="block text-sm font-medium text-neutral-700 mb-1">End Date</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-calendar-end"></span>
-                </span>
-                <input 
-                  id="project-end-date"
-                  v-model="editedProject.endDate"
-                  type="date"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-            
-            <!-- Initially Raised On -->
-            <div>
-              <label for="project-raised-on" class="block text-sm font-medium text-neutral-700 mb-1">Initially Raised On</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-calendar-plus"></span>
-                </span>
-                <input 
-                  id="project-raised-on"
-                  v-model="editedProject.initiallyRaisedOn"
-                  type="date"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-            
-            <!-- Deadline -->
-            <div>
-              <label for="project-deadline" class="block text-sm font-medium text-neutral-700 mb-1">Deadline</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-clock-alert-outline"></span>
-                </span>
-                <input 
-                  id="project-deadline"
-                  v-model="editedProject.deadline"
-                  type="date"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-            
-            <!-- Progress -->
-            <div>
-              <label for="project-progress" class="block text-sm font-medium text-neutral-700 mb-1">Progress (%)</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-percent"></span>
-                </span>
-                <input 
-                  id="project-progress"
-                  v-model.number="editedProject.progress"
-                  type="number"
-                  min="0"
-                  max="100"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-                <div class="absolute inset-y-0 right-0 flex items-center pr-3">
-                  <span class="text-sm text-neutral-500">{{ editedProject.progress }}%</span>
+        <!-- Main Edit Tabs Content -->
+        <div class="my-6">
+          <!-- Basic Info Tab -->
+          <div v-if="activeTab === 'basic'" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Project Name -->
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <label for="project-name" class="block text-sm font-medium text-neutral-700 mb-2">
+                  <span class="flex items-center gap-2">
+                    <span class="mdi mdi-folder-outline text-primary-600"></span>
+                    Project Name
+                  </span>
+                </label>
+                <div class="relative">
+                  <input 
+                    id="project-name"
+                    v-model="editedProject.name"
+                    type="text"
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  />
                 </div>
               </div>
-              <div class="mt-2 w-full bg-neutral-200 rounded-full h-2">
-                <div
-                  class="bg-primary-500 h-2 rounded-full transition-all duration-300"
+              
+              <!-- Company -->
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <label for="project-company" class="block text-sm font-medium text-neutral-700 mb-2">
+                  <span class="flex items-center gap-2">
+                    <span class="mdi mdi-office-building text-primary-600"></span>
+                    Company
+                  </span>
+                </label>
+                <div class="relative">
+                  <input 
+                    id="project-company"
+                    v-model="editedProject.company"
+                    type="text"
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <!-- Category -->
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <label for="project-category" class="block text-sm font-medium text-neutral-700 mb-2">
+                  <span class="flex items-center gap-2">
+                    <span class="mdi mdi-shape-outline text-primary-600"></span>
+                    Category
+                  </span>
+                </label>
+                <div class="relative">
+                  <select 
+                    id="project-category"
+                    v-model="editedProject.category"
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  >
+                    <option value="Development">Development</option>
+                    <option value="Design">Design</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Research">Research</option>
+                    <option value="Support">Support</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+              
+              <!-- Status -->
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <label for="project-status" class="block text-sm font-medium text-neutral-700 mb-2">
+                  <span class="flex items-center gap-2">
+                    <span class="mdi mdi-check-circle-outline text-primary-600"></span>
+                    Status
+                  </span>
+                </label>
+                <div class="relative">
+                  <select 
+                    id="project-status"
+                    v-model="editedProject.status"
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  >
+                    <option v-for="status in projectStatuses" :key="status" :value="status">{{ status }}</option>
+                  </select>
+                </div>
+              </div>
+              
+              <!-- Priority -->
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <label for="project-priority" class="block text-sm font-medium text-neutral-700 mb-2">
+                  <span class="flex items-center gap-2">
+                    <span class="mdi mdi-flag text-primary-600"></span>
+                    Priority
+                  </span>
+                </label>
+                <div class="relative">
+                  <select 
+                    id="project-priority"
+                    v-model="editedProject.priority"
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+              <div class="flex justify-between items-center mb-2">
+                <label for="project-progress" class="block text-sm font-medium text-neutral-700 flex items-center gap-2">
+                  <span class="mdi mdi-chart-line text-primary-600"></span>
+                  Progress
+                </label>
+                <div 
+                  :class="[
+                    'text-xs font-medium py-1 px-3 rounded-full', 
+                    editedProject.progress >= 75 ? 'bg-success-100 text-success-800' : 
+                    editedProject.progress >= 40 ? 'bg-accent-100 text-accent-800' : 
+                    'bg-warning-100 text-warning-800'
+                  ]"
+                >
+                  {{ editedProject.progress }}%
+                </div>
+              </div>
+              <div class="w-full bg-neutral-200 rounded-full h-2.5 my-2">
+                <div 
+                  :class="[
+                    'h-2.5 rounded-full transition-all duration-300',
+                    editedProject.progress >= 75 ? 'bg-success-600' : 
+                    editedProject.progress >= 40 ? 'bg-accent-600' : 
+                    'bg-warning-600' 
+                  ]"
                   :style="`width: ${editedProject.progress}%`"
                 ></div>
               </div>
+              <input 
+                id="project-progress"
+                v-model.number="editedProject.progress"
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-4"
+              />
+              <div class="flex justify-between text-xs text-neutral-500 mt-1 px-1">
+                <span>0%</span>
+                <span>25%</span>
+                <span>50%</span>
+                <span>75%</span>
+                <span>100%</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Team Members Tab -->
+          <div v-if="activeTab === 'team'" class="space-y-8">
+            <!-- Project Lead - Enhanced with UserSelect component -->
+            <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-primary-500 mb-6">
+              <h3 class="text-md font-semibold text-neutral-800 mb-4 flex items-center">
+                <span class="mdi mdi-account-tie text-xl text-primary-600 mr-2"></span>
+                Project Leadership
+              </h3>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Project Lead -->
+                <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                  <label class="block text-sm font-medium text-neutral-700 mb-3 flex items-center justify-between">
+                    <span class="flex items-center gap-2">
+                      <span class="mdi mdi-account text-primary-600"></span>
+                      Project Lead
+                    </span>
+                    <span v-if="editedProject.assignedTo" class="text-xs bg-primary-50 text-primary-600 px-2 py-1 rounded">Assigned</span>
+                  </label>
+                  <!-- Using UserSelect component -->
+                  <UserSelect
+                    v-model="editedProject.assignedTo"
+                    :required="true"
+                    placeholder="Select project lead"
+                    :filterRole="null"
+                  />
+                </div>
+                
+                <!-- Responsible Person -->
+                <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                  <label class="block text-sm font-medium text-neutral-700 mb-3 flex items-center justify-between">
+                    <span class="flex items-center gap-2">
+                      <span class="mdi mdi-account-star text-primary-600"></span>
+                      Responsible Person
+                    </span>
+                    <span v-if="editedProject.responsiblePerson" class="text-xs bg-primary-50 text-primary-600 px-2 py-1 rounded">Assigned</span>
+                  </label>
+                  <!-- Using UserSelect component -->
+                  <UserSelect
+                    v-model="editedProject.responsiblePerson"
+                    placeholder="Select responsible person"
+                    :filterRole="null"
+                  />
+                </div>
+              </div>
             </div>
             
-            <!-- Pending Days -->
-            <div>
-              <label for="project-pending" class="block text-sm font-medium text-neutral-700 mb-1">Pending Days</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-calendar-clock"></span>
+            <!-- Team Members - Enhanced with UserSelect component -->
+            <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-accent-500 mb-6">
+              <div class="flex justify-between items-center mb-4">
+                <h3 class="text-md font-semibold text-neutral-800 flex items-center">
+                  <span class="mdi mdi-account-multiple text-xl text-accent-600 mr-2"></span>
+                  Team Members
+                </h3>
+                <span v-if="hasExistingTeamMembers" class="bg-accent-50 text-accent-700 text-xs px-2 py-1 rounded-md flex items-center">
+                  <span class="mdi mdi-account-group mr-1"></span>
+                  {{ editedProject.team.length }} Members
                 </span>
-                <input 
-                  id="project-pending"
-                  v-model.number="editedProject.pendingDays"
-                  type="number"
-                  min="0"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              </div>
+              
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <!-- Using UserSelect component -->
+                <UserSelect
+                  v-model="editedProject.team"
+                  multiple
+                  placeholder="Select team members"
+                  :filterRole="null"
                 />
-                <div class="absolute inset-y-0 right-0 flex items-center pr-3">
-                  <span class="text-sm text-neutral-500">days</span>
+              </div>
+              
+              <!-- Current team members display -->
+              <div v-if="hasExistingTeamMembers" class="mt-6">
+                <h4 class="text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
+                  <span class="mdi mdi-account-check-outline text-accent-600"></span>
+                  Current Team
+                </h4>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div 
+                    v-for="(memberId, index) in editedProject.team" 
+                    :key="`team-${index}`"
+                    class="flex items-center p-3 bg-white border border-neutral-200 rounded-lg hover:shadow-sm transition-all duration-200"
+                  >
+                    <div class="w-8 h-8 rounded-full bg-accent-100 text-accent-600 flex items-center justify-center mr-3">
+                      <span class="mdi mdi-account text-lg"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium truncate">{{ typeof memberId === 'string' ? memberId : '(Unknown)' }}</div>
+                    </div>
+                    <button 
+                      type="button" 
+                      @click="editedProject.team = editedProject.team.filter((_, i) => i !== index)"
+                      class="ml-2 text-neutral-400 hover:text-error-500 transition-colors"
+                      title="Remove from team"
+                    >
+                      <span class="mdi mdi-close-circle"></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Empty state when no team members -->
+              <div v-else class="text-center p-6 bg-neutral-50 rounded-lg border border-dashed border-neutral-200 mt-4">
+                <span class="mdi mdi-account-group-outline text-4xl text-neutral-400 block mb-2"></span>
+                <p class="text-neutral-500">No team members assigned yet</p>
+                <p class="text-xs text-neutral-400 mt-1">Use the dropdown above to add team members</p>
+              </div>
+            </div>
+            
+            <!-- Developers - Enhanced with UserSelect component -->
+            <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-success-500">
+              <div class="flex justify-between items-center mb-4">
+                <h3 class="text-md font-semibold text-neutral-800 flex items-center">
+                  <span class="mdi mdi-laptop text-xl text-success-600 mr-2"></span>
+                  Developers
+                </h3>
+                <span v-if="hasExistingDevelopers" class="bg-success-50 text-success-700 text-xs px-2 py-1 rounded-md flex items-center">
+                  <span class="mdi mdi-laptop mr-1"></span>
+                  {{ editedProject.developers.length }} Developers
+                </span>
+              </div>
+              
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <!-- Using UserSelect component -->
+                <UserSelect
+                  v-model="editedProject.developers"
+                  multiple
+                  placeholder="Select developers"
+                  :filterRole="null"
+                />
+              </div>
+              
+              <!-- Current developers display -->
+              <div v-if="hasExistingDevelopers" class="mt-6">
+                <h4 class="text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
+                  <span class="mdi mdi-check-circle-outline text-success-600"></span>
+                  Current Developers
+                </h4>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div 
+                    v-for="(devId, index) in editedProject.developers" 
+                    :key="`dev-${index}`"
+                    class="flex items-center p-3 bg-white border border-neutral-200 rounded-lg hover:shadow-sm transition-all duration-200"
+                  >
+                    <div class="w-8 h-8 rounded-full bg-success-100 text-success-600 flex items-center justify-center mr-3">
+                      <span class="mdi mdi-laptop text-lg"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium truncate">{{ typeof devId === 'string' ? devId : '(Unknown)' }}</div>
+                    </div>
+                    <button 
+                      type="button" 
+                      @click="editedProject.developers = editedProject.developers.filter((_, i) => i !== index)"
+                      class="ml-2 text-neutral-400 hover:text-error-500 transition-colors"
+                      title="Remove developer"
+                    >
+                      <span class="mdi mdi-close-circle"></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Empty state when no developers -->
+              <div v-else class="text-center p-6 bg-neutral-50 rounded-lg border border-dashed border-neutral-200 mt-4">
+                <span class="mdi mdi-laptop-off text-4xl text-neutral-400 block mb-2"></span>
+                <p class="text-neutral-500">No developers assigned yet</p>
+                <p class="text-xs text-neutral-400 mt-1">Use the dropdown above to assign developers to this project</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Timeline Tab -->
+          <div v-if="activeTab === 'timeline'" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <!-- Start Date -->
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <label for="project-start-date" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                  <span class="mdi mdi-calendar-start text-primary-600"></span>
+                  Start Date
+                </label>
+                <div class="relative">
+                  <input 
+                    id="project-start-date"
+                    v-model="editedProject.startDate"
+                    type="date"
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+              
+              <!-- End Date -->
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <label for="project-end-date" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                  <span class="mdi mdi-calendar-end text-primary-600"></span>
+                  End Date
+                </label>
+                <div class="relative">
+                  <input 
+                    id="project-end-date"
+                    v-model="editedProject.endDate"
+                    type="date"
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+              
+              <!-- Initially Raised On -->
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <label for="project-raised-on" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                  <span class="mdi mdi-calendar-plus text-primary-600"></span>
+                  Initially Raised On
+                </label>
+                <div class="relative">
+                  <input 
+                    id="project-raised-on"
+                    v-model="editedProject.initiallyRaisedOn"
+                    type="date"
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+              
+              <!-- Deadline -->
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <label for="project-deadline" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                  <span class="mdi mdi-clock-alert-outline text-primary-600"></span>
+                  Deadline
+                </label>
+                <div class="relative">
+                  <input 
+                    id="project-deadline"
+                    v-model="editedProject.deadline"
+                    type="date"
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+              
+              <!-- Status Phase -->
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <label for="project-status-phase" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                  <span class="mdi mdi-playlist-check text-primary-600"></span>
+                  Status Phase
+                </label>
+                <div class="relative">
+                  <select 
+                    id="project-status-phase"
+                    v-model="editedProject.statusPhase"
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  >
+                    <option value="">Select status phase</option>
+                    <option value="Planning">Planning</option>
+                    <option value="Development">Development</option>
+                    <option value="Testing">Testing</option>
+                    <option value="Deployment">Deployment</option>
+                    <option value="Maintenance">Maintenance</option>
+                  </select>
+                </div>
+              </div>
+              
+              <!-- Pending Days -->
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                <label for="project-pending" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                  <span class="mdi mdi-calendar-clock text-primary-600"></span>
+                  Pending Days
+                </label>
+                <div class="flex items-center">
+                  <input 
+                    id="project-pending"
+                    v-model.number="editedProject.pendingDays"
+                    type="number"
+                    min="0"
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  />
+                  <span class="ml-2 text-neutral-500">days</span>
+                </div>
+                <div class="text-xs text-neutral-500 mt-2">
+                  <span class="mdi mdi-information-outline mr-1"></span>
+                  Auto-calculated from initially raised date
+                </div>
+              </div>
+            </div>
+            
+            <!-- Timeline visualization -->
+            <div class="bg-white rounded-xl shadow-md p-6 border border-neutral-100">
+              <h3 class="text-md font-semibold text-neutral-800 mb-3">Timeline Overview</h3>
+              <div class="relative pt-6 pb-2">
+                <div class="absolute left-0 right-0 top-0 flex justify-between px-6">
+                  <div class="text-xs text-neutral-500">Start</div>
+                  <div class="text-xs text-neutral-500">End</div>
+                </div>
+                <div class="h-3 bg-neutral-100 rounded-full overflow-hidden relative">
+                  <div
+                    class="absolute h-full bg-primary-500 rounded-full"
+                    :style="`width: ${editedProject.progress}%`"
+                  ></div>
+                </div>
+                <div class="flex justify-between mt-2">
+                  <div class="text-xs font-medium">{{ editedProject.startDate }}</div>
+                  <div class="text-xs font-medium">{{ editedProject.endDate }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Additional Details Tab -->
+          <div v-if="activeTab === 'details'" class="space-y-6">
+            <!-- Remarks -->
+            <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+              <label for="project-remarks" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                <span class="mdi mdi-message-text-outline text-primary-600"></span>
+                Remarks
+              </label>
+              <div class="relative">
+                <textarea 
+                  id="project-remarks"
+                  v-model="editedProject.remarks"
+                  rows="4"
+                  placeholder="Project remarks or description"
+                  class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                ></textarea>
+              </div>
+            </div>
+            
+            <!-- Notes -->
+            <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+              <label for="project-notes" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                <span class="mdi mdi-notebook-outline text-primary-600"></span>
+                Notes
+              </label>
+              <div class="relative">
+                <textarea 
+                  id="project-notes"
+                  v-model="editedProject.notes"
+                  rows="4"
+                  placeholder="Additional project notes"
+                  class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                ></textarea>
+              </div>
+            </div>
+            
+            <!-- Comments -->
+            <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+              <label for="project-comments" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                <span class="mdi mdi-comment-text-outline text-primary-600"></span>
+                Comments
+              </label>
+              <div class="relative">
+                <textarea 
+                  id="project-comments"
+                  v-model="editedProject.comments"
+                  rows="4"
+                  placeholder="General project comments"
+                  class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Blockers Tab -->
+          <div v-if="activeTab === 'blockers'" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Blockers -->
+              <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-error-500">
+                <label for="project-blockers" class="block text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
+                  <span class="mdi mdi-alert-circle text-error-600"></span>
+                  Blockers
+                </label>
+                <div class="relative">
+                  <textarea 
+                    id="project-blockers"
+                    v-model="editedProject.blockers"
+                    rows="6"
+                    placeholder="List any blockers preventing progress..."
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  ></textarea>
+                  <span class="absolute top-3 right-3 text-error-400 text-lg">
+                    <span class="mdi mdi-alert-circle"></span>
+                  </span>
+                </div>
+              </div>
+              
+              <!-- Feedback for Blockers -->
+              <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-accent-500">
+                <label for="project-feedback" class="block text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
+                  <span class="mdi mdi-message-reply text-accent-600"></span>
+                  Feedback for Blockers
+                </label>
+                <div class="relative">
+                  <textarea 
+                    id="project-feedback"
+                    v-model="editedProject.feedbackForBlockers"
+                    rows="6"
+                    placeholder="Add feedback about project blockers..."
+                    class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  ></textarea>
+                  <span class="absolute top-3 right-3 text-accent-400 text-lg">
+                    <span class="mdi mdi-message-reply"></span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- External Links Tab - New Tab -->
+          <div v-if="activeTab === 'links'" class="space-y-6">
+            <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
+              <h3 class="text-md font-semibold text-neutral-800 mb-4 flex items-center">
+                <span class="mdi mdi-link-variant text-xl text-purple-600 mr-2"></span>
+                External Project Links
+              </h3>
+              
+              <div class="grid grid-cols-1 gap-6">
+                <!-- GitHub Repository Link -->
+                <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                  <label for="project-github" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                    <span class="mdi mdi-github text-xl text-neutral-800"></span>
+                    GitHub Repository
+                  </label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
+                      <span class="mdi mdi-link"></span>
+                    </span>
+                    <input 
+                      id="project-github"
+                      v-model="editedProject.externalLinks.githubRepo"
+                      type="text"
+                      placeholder="https://github.com/username/repository"
+                      class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    />
+                  </div>
+                  <p class="text-xs text-neutral-500 mt-2">
+                    <span class="mdi mdi-information-outline mr-1"></span>
+                    Enter the full GitHub repository URL
+                  </p>
+                </div>
+                
+                <!-- Figma Link -->
+                <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                  <label for="project-figma" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                    <span class="mdi mdi-figma text-xl text-pink-600"></span>
+                    Figma Design Link
+                  </label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
+                      <span class="mdi mdi-link"></span>
+                    </span>
+                    <input 
+                      id="project-figma"
+                      v-model="editedProject.externalLinks.figmaLink"
+                      type="text"
+                      placeholder="https://www.figma.com/file/..."
+                      class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    />
+                  </div>
+                  <p class="text-xs text-neutral-500 mt-2">
+                    <span class="mdi mdi-information-outline mr-1"></span>
+                    Enter the Figma design file link
+                  </p>
+                </div>
+                
+                <!-- Jira Project Link -->
+                <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
+                  <label for="project-jira" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
+                    <span class="mdi mdi-jira text-xl text-blue-600"></span>
+                    Jira Project Link
+                  </label>
+                  <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
+                      <span class="mdi mdi-link"></span>
+                    </span>
+                    <input 
+                      id="project-jira"
+                      v-model="editedProject.externalLinks.jiraProject"
+                      type="text"
+                      placeholder="https://your-domain.atlassian.net/jira/..."
+                      class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    />
+                  </div>
+                  <p class="text-xs text-neutral-500 mt-2">
+                    <span class="mdi mdi-information-outline mr-1"></span>
+                    Enter the Jira project board link
+                  </p>
+                </div>
+              </div>
+              
+              <!-- Preview of links -->
+              <div class="mt-6 bg-white rounded-lg border border-neutral-200 p-4">
+                <h4 class="text-sm font-medium text-neutral-700 mb-3">Preview</h4>
+                <div class="space-y-2">
+                  <div class="flex items-center" v-if="editedProject.externalLinks.githubRepo">
+                    <span class="mdi mdi-github text-xl mr-2"></span>
+                    <span class="text-sm text-primary-600 truncate">{{ editedProject.externalLinks.githubRepo }}</span>
+                  </div>
+                  <div class="flex items-center" v-if="editedProject.externalLinks.figmaLink">
+                    <span class="mdi mdi-figma text-xl mr-2 text-pink-600"></span>
+                    <span class="text-sm text-primary-600 truncate">{{ editedProject.externalLinks.figmaLink }}</span>
+                  </div>
+                  <div class="flex items-center" v-if="editedProject.externalLinks.jiraProject">
+                    <span class="mdi mdi-jira text-xl mr-2 text-blue-600"></span>
+                    <span class="text-sm text-primary-600 truncate">{{ editedProject.externalLinks.jiraProject }}</span>
+                  </div>
+                  <div class="text-center text-sm text-neutral-500 py-2" v-if="!editedProject.externalLinks.githubRepo && !editedProject.externalLinks.figmaLink && !editedProject.externalLinks.jiraProject">
+                    No external links added yet
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
         
-        <!-- Team Information -->
-        <div class="mb-8">
-          <h3 class="text-md font-medium text-neutral-800 mb-3 border-b border-neutral-200 pb-2">Team Information</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Assigned To -->
-            <div>
-              <label for="project-assigned" class="block text-sm font-medium text-neutral-700 mb-1">Project Lead</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-account"></span>
-                </span>
-                <input 
-                  id="project-assigned"
-                  v-model="editedProject.assignedTo"
-                  type="text"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-            
-            <!-- Responsible Person -->
-            <div>
-              <label for="project-responsible" class="block text-sm font-medium text-neutral-700 mb-1">Responsible Person</label>
-              <div class="relative">
-                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-500">
-                  <span class="mdi mdi-account-star"></span>
-                </span>
-                <input 
-                  id="project-responsible"
-                  v-model="editedProject.responsiblePerson"
-                  type="text"
-                  placeholder="Person responsible for the project"
-                  class="pl-10 block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Project Description -->
-        <div class="mb-8">
-          <h3 class="text-md font-medium text-neutral-800 mb-3 border-b border-neutral-200 pb-2">Project Description</h3>
-          <div class="grid grid-cols-1 md:grid-cols-1 gap-4">
-            <!-- Remarks -->
-            <div>
-              <label for="project-remarks" class="block text-sm font-medium text-neutral-700 mb-1">Remarks</label>
-              <textarea 
-                id="project-remarks"
-                v-model="editedProject.remarks"
-                rows="3"
-                placeholder="Project remarks or description"
-                class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              ></textarea>
-            </div>
-            
-            <!-- Notes -->
-            <div>
-              <label for="project-notes" class="block text-sm font-medium text-neutral-700 mb-1">Notes</label>
-              <textarea 
-                id="project-notes"
-                v-model="editedProject.notes"
-                rows="3"
-                placeholder="Additional project notes"
-                class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              ></textarea>
-            </div>
-            
-            <!-- Comments -->
-            <div>
-              <label for="project-comments" class="block text-sm font-medium text-neutral-700 mb-1">Comments</label>
-              <textarea 
-                id="project-comments"
-                v-model="editedProject.comments"
-                rows="3"
-                placeholder="General project comments"
-                class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              ></textarea>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Blockers Information -->
-        <div class="mb-8">
-          <h3 class="text-md font-medium text-neutral-800 mb-3 border-b border-neutral-200 pb-2">Blockers & Feedback</h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Blockers -->
-            <div>
-              <label for="project-blockers" class="block text-sm font-medium text-neutral-700 mb-1">Blockers</label>
-              <div class="relative">
-                <textarea 
-                  id="project-blockers"
-                  v-model="editedProject.blockers"
-                  rows="4"
-                  placeholder="List any blockers preventing progress..."
-                  class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                ></textarea>
-                <span class="absolute top-2 right-2 text-red-400 text-lg">
-                  <span class="mdi mdi-alert-circle"></span>
-                </span>
-              </div>
-            </div>
-            
-            <!-- Feedback for Blockers -->
-            <div>
-              <label for="project-feedback" class="block text-sm font-medium text-neutral-700 mb-1">Feedback for Blockers</label>
-              <div class="relative">
-                <textarea 
-                  id="project-feedback"
-                  v-model="editedProject.feedbackForBlockers"
-                  rows="4"
-                  placeholder="Add feedback about project blockers..."
-                  class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                ></textarea>
-                <span class="absolute top-2 right-2 text-primary-400 text-lg">
-                  <span class="mdi mdi-message-reply"></span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Action Buttons -->
-        <div class="flex justify-end gap-3">
+        <!-- Action Buttons - Sticky to bottom of form -->
+        <div class="sticky bottom-0 bg-white p-5 border-t border-neutral-200 flex justify-end gap-3 -mx-6 -mb-6 mt-6 rounded-b-lg">
           <button 
             @click="toggleEditMode" 
-            class="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md bg-white text-neutral-700 hover:bg-neutral-50"
+            class="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md bg-white text-neutral-700 hover:bg-neutral-50 transition-colors"
           >
-            <span class="mdi mdi-cancel text-lg mr-2"></span>
+            <span class="mdi mdi-close text-lg mr-2"></span>
             Cancel
           </button>
           
           <button 
             @click="saveProject" 
-            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md bg-success-600 text-white hover:bg-success-700 shadow-sm"
+            class="inline-flex items-center px-8 py-2 border border-transparent text-sm font-medium rounded-md bg-success-600 text-white hover:bg-success-700 shadow-sm transition-all duration-200"
           >
             <span class="mdi mdi-content-save text-lg mr-2"></span>
-            Save Changes
+            Save Project
           </button>
         </div>
       </div>
@@ -996,6 +1474,17 @@ onMounted(() => {
             Overview
           </button>
           <button 
+            @click="activeTab = 'team'"
+            :class="[
+              'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
+              activeTab === 'team' 
+                ? 'border-primary-600 text-primary-600' 
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            ]"
+          >
+            Team
+          </button>
+          <button 
             @click="activeTab = 'updates'"
             :class="[
               'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
@@ -1016,6 +1505,19 @@ onMounted(() => {
             ]"
           >
             Files
+          </button>
+          <button 
+            v-if="hasExternalLinks"
+            @click="activeTab = 'links'"
+            :class="[
+              'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
+              activeTab === 'links' 
+                ? 'border-primary-600 text-primary-600' 
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            ]"
+          >
+            <span class="mdi mdi-link-variant mr-1"></span>
+            External Links
           </button>
         </nav>
       </div>
@@ -1166,6 +1668,75 @@ onMounted(() => {
             Comments
           </h3>
           <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.comments || 'No comments added' }}</p>
+        </div>
+        
+        <!-- External Links Section - Add before the Team Information section -->
+        <div v-if="hasExternalLinks" class="mt-8">
+          <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
+            <span class="mdi mdi-link-variant text-lg text-purple-600 mr-2"></span>
+            External Resources
+          </h3>
+          
+          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 mt-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- GitHub Repository -->
+              <div v-if="project.externalLinks.githubRepo" 
+                  class="bg-neutral-50 p-4 rounded-lg border border-l-4 border-l-neutral-800 transition-all duration-200 hover:shadow-md"
+                  @click="openExternalLink(project.externalLinks.githubRepo)"
+                  role="link"
+                  tabindex="0"
+                  :title="project.externalLinks.githubRepo"
+              >
+                <div class="flex items-center">
+                  <div class="h-10 w-10 rounded-full bg-neutral-800 flex items-center justify-center mr-3">
+                    <span class="mdi mdi-github text-xl text-white"></span>
+                  </div>
+                  <div>
+                    <div class="text-sm font-medium text-neutral-900">GitHub Repository</div>
+                    <div class="text-xs text-neutral-500 truncate max-w-[180px]">{{ project.externalLinks.githubRepo }}</div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Figma Design -->
+              <div v-if="project.externalLinks.figmaLink" 
+                  class="bg-neutral-50 p-4 rounded-lg border border-l-4 border-l-pink-500 transition-all duration-200 hover:shadow-md"
+                  @click="openExternalLink(project.externalLinks.figmaLink)"
+                  role="link"
+                  tabindex="0"
+                  :title="project.externalLinks.figmaLink"
+              >
+                <div class="flex items-center">
+                  <div class="h-10 w-10 rounded-full bg-pink-100 flex items-center justify-center mr-3">
+                    <span class="mdi mdi-figma text-xl text-pink-600"></span>
+                  </div>
+                  <div>
+                    <div class="text-sm font-medium text-neutral-900">Figma Design</div>
+                    <div class="text-xs text-neutral-500 truncate max-w-[180px]">{{ project.externalLinks.figmaLink }}</div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Jira Project -->
+              <div v-if="project.externalLinks.jiraProject" 
+                  class="bg-neutral-50 p-4 rounded-lg border border-l-4 border-l-blue-500 transition-all duration-200 hover:shadow-md"
+                  @click="openExternalLink(project.externalLinks.jiraProject)"
+                  role="link"
+                  tabindex="0"
+                  :title="project.externalLinks.jiraProject"
+              >
+                <div class="flex items-center">
+                  <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                    <span class="mdi mdi-jira text-xl text-blue-600"></span>
+                  </div>
+                  <div>
+                    <div class="text-sm font-medium text-neutral-900">Jira Project</div>
+                    <div class="text-xs text-neutral-500 truncate max-w-[180px]">{{ project.externalLinks.jiraProject }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         
         <!-- Team Information Section -->
@@ -1494,6 +2065,379 @@ onMounted(() => {
           <p v-if="canEdit" class="text-sm mt-1">Upload files to share project documents with the team.</p>
         </div>
       </div>
+
+      <!-- Team Tab -->
+      <div v-if="activeTab === 'team'" class="bg-white rounded-lg shadow-card p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-lg font-medium text-neutral-900 flex items-center">
+            Project Team Members
+          </h2>
+          
+          <button 
+            v-if="canEdit && !isEditing"
+            @click="toggleEditMode"
+            class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700"
+          >
+            <span class="mdi mdi-account-edit mr-1"></span>
+            Edit Team
+          </button>
+        </div>
+        
+        <!-- Team leadership section -->
+        <div class="mb-8">
+          <h3 class="text-md font-medium text-neutral-700 mb-4 pb-2 border-b border-neutral-200">
+            Leadership
+          </h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Project Lead Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-neutral-100 p-5 transition-all duration-300 hover:shadow-md">
+              <div class="flex items-center">
+                <div class="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                  <span class="mdi mdi-account-tie text-2xl text-primary-600"></span>
+                </div>
+                <div class="ml-4">
+                  <h4 class="font-medium text-neutral-900">{{ project.assignedTo || 'No project lead assigned' }}</h4>
+                  <div class="flex items-center mt-1">
+                    <span class="bg-primary-100 text-primary-800 text-xs px-2 py-0.5 rounded-full">Project Lead</span>
+                  </div>
+                  <p class="text-sm text-neutral-500 mt-2">
+                    <span class="mdi mdi-check-decagram text-primary-500 mr-1"></span>
+                    Overall project responsibility
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Responsible Person Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-neutral-100 p-5 transition-all duration-300 hover:shadow-md">
+              <div class="flex items-center">
+                <div class="h-16 w-16 rounded-full bg-accent-100 flex items-center justify-center flex-shrink-0">
+                  <span class="mdi mdi-account-star text-2xl text-accent-600"></span>
+                </div>
+                <div class="ml-4">
+                  <h4 class="font-medium text-neutral-900">{{ project.responsiblePerson || 'Not assigned' }}</h4>
+                  <div class="flex items-center mt-1">
+                    <span class="bg-accent-100 text-accent-800 text-xs px-2 py-0.5 rounded-full">Responsible Person</span>
+                  </div>
+                  <p class="text-sm text-neutral-500 mt-2">
+                    <span class="mdi mdi-clipboard-check text-accent-500 mr-1"></span>
+                    Day-to-day project management
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Team members section -->
+        <div class="mb-8">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-md font-medium text-neutral-700 pb-2 border-b border-neutral-200">
+              Team Members
+              <span v-if="project.team && project.team.length > 0" class="ml-2 px-2 py-0.5 bg-neutral-100 text-neutral-700 text-xs rounded-full">
+                {{ project.team.length }}
+              </span>
+            </h3>
+            
+            <div v-if="project.team && project.team.length > 0" class="text-sm">
+              <div class="flex items-center gap-1 text-neutral-500">
+                <span class="mdi mdi-account-group"></span>
+                <span>{{ project.team.length }} {{ project.team.length === 1 ? 'member' : 'members' }}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div v-if="project.team && project.team.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Team member card -->
+            <div v-for="(member, index) in project.team" :key="index" 
+              class="bg-white rounded-lg border border-neutral-200 shadow-sm p-4 hover:shadow-md transition-all duration-300">
+              <div class="flex items-center">
+                <div class="h-12 w-12 rounded-full bg-neutral-100 flex items-center justify-center flex-shrink-0">
+                  <span class="mdi mdi-account text-xl text-neutral-600"></span>
+                </div>
+                <div class="ml-3 flex-1 min-w-0">
+                  <div class="font-medium text-neutral-900 truncate">{{ member }}</div>
+                  <div class="text-xs text-neutral-500 mt-1">Team Member</div>
+                </div>
+                <div v-if="canEdit && isEditing" 
+                  class="ml-2 p-1 rounded-full hover:bg-neutral-100 cursor-pointer" 
+                  title="Remove member"
+                >
+                  <span class="mdi mdi-close text-neutral-500 hover:text-error-600"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- No team members placeholder -->
+          <div v-else class="bg-neutral-50 rounded-lg p-8 text-center">
+            <div class="h-16 w-16 rounded-full bg-neutral-200 mx-auto flex items-center justify-center mb-3">
+              <span class="mdi mdi-account-group text-2xl text-neutral-400"></span>
+            </div>
+            <h4 class="text-neutral-600 font-medium mb-2">No Team Members Assigned</h4>
+            <p class="text-neutral-500 text-sm max-w-md mx-auto">
+              Team members contribute to the project and help achieve project goals.
+              {{ canEdit ? 'Click "Edit Team" to add team members to this project.' : '' }}
+            </p>
+          </div>
+        </div>
+        
+        <!-- Developers section -->
+        <div class="mb-8">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-md font-medium text-neutral-700 pb-2 border-b border-neutral-200">
+              Developers
+              <span v-if="project.developers && project.developers.length > 0" class="ml-2 px-2 py-0.5 bg-neutral-100 text-neutral-700 text-xs rounded-full">
+                {{ project.developers.length }}
+              </span>
+            </h3>
+          </div>
+          
+          <div v-if="project.developers && project.developers.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Developer card -->
+            <div v-for="(developer, index) in project.developers" :key="index" 
+              class="bg-white rounded-lg border border-neutral-200 shadow-sm p-4 hover:shadow-md transition-all duration-300">
+              <div class="flex items-center">
+                <div class="h-12 w-12 rounded-full bg-success-100 flex items-center justify-center flex-shrink-0">
+                  <span class="mdi mdi-laptop text-xl text-success-600"></span>
+                </div>
+                <div class="ml-3 flex-1 min-w-0">
+                  <div class="font-medium text-neutral-900 truncate">{{ developer }}</div>
+                  <div class="text-xs text-neutral-500 mt-1">Developer</div>
+                </div>
+                <div v-if="canEdit && isEditing" 
+                  class="ml-2 p-1 rounded-full hover:bg-neutral-100 cursor-pointer" 
+                  title="Remove developer"
+                >
+                  <span class="mdi mdi-close text-neutral-500 hover:text-error-600"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- No developers placeholder -->
+          <div v-else class="bg-neutral-50 rounded-lg p-8 text-center">
+            <div class="h-16 w-16 rounded-full bg-neutral-200 mx-auto flex items-center justify-center mb-3">
+              <span class="mdi mdi-laptop text-2xl text-neutral-400"></span>
+            </div>
+            <h4 class="text-neutral-600 font-medium mb-2">No Developers Assigned</h4>
+            <p class="text-neutral-500 text-sm max-w-md mx-auto">
+              Developers implement the technical aspects of the project.
+              {{ canEdit ? 'Click "Edit Team" to add developers to this project.' : '' }}
+            </p>
+          </div>
+        </div>
+        
+        <!-- Team Statistics -->
+        <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5">
+          <h3 class="text-md font-medium text-neutral-700 mb-4 flex items-center">
+            <span class="mdi mdi-chart-areaspline text-primary-600 mr-2"></span>
+            Team Statistics
+          </h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-neutral-50 rounded-lg p-4">
+              <div class="text-sm text-neutral-500 mb-1">Total Team Size</div>
+              <div class="text-2xl font-bold text-neutral-800">
+                {{ 
+                  (project.team ? project.team.length : 0) + 
+                  (project.developers ? project.developers.length : 0) + 
+                  (project.assignedTo ? 1 : 0) + 
+                  (project.responsiblePerson && project.responsiblePerson !== project.assignedTo ? 1 : 0)
+                }}
+              </div>
+              <div class="mt-2 text-xs text-neutral-500">Combined project staff</div>
+            </div>
+            
+            <div class="bg-neutral-50 rounded-lg p-4">
+              <div class="text-sm text-neutral-500 mb-1">Core Team</div>
+              <div class="text-2xl font-bold text-neutral-800">
+                {{ (project.team ? project.team.length : 0) }}
+              </div>
+              <div class="mt-2 text-xs text-neutral-500">General team members</div>
+            </div>
+            
+            <div class="bg-neutral-50 rounded-lg p-4">
+              <div class="text-sm text-neutral-500 mb-1">Technical Team</div>
+              <div class="text-2xl font-bold text-neutral-800">
+                {{ (project.developers ? project.developers.length : 0) }}
+              </div>
+              <div class="mt-2 text-xs text-neutral-500">Assigned developers</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- External Links Tab Content -->
+      <div v-if="activeTab === 'links'" class="bg-white rounded-lg shadow-card p-6">
+        <h2 class="text-lg font-medium text-neutral-900 mb-6 flex items-center">
+          <span class="mdi mdi-link-variant text-xl text-purple-600 mr-2"></span>
+          External Project Links
+        </h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <!-- GitHub Repository -->
+          <div v-if="project.externalLinks.githubRepo" class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+            <div class="h-16 w-16 rounded-xl bg-neutral-800 flex items-center justify-center mb-4">
+              <span class="mdi mdi-github text-3xl text-white"></span>
+            </div>
+            <h3 class="text-lg font-medium text-neutral-800 mb-1">GitHub Repository</h3>
+            <p class="text-sm text-neutral-600 mb-4">Access the project's source code repository</p>
+            <div class="text-sm text-neutral-500 bg-neutral-50 p-3 rounded-md mb-4 break-all">
+              {{ project.externalLinks.githubRepo }}
+            </div>
+            <a 
+              :href="isValidUrl(project.externalLinks.githubRepo) ? project.externalLinks.githubRepo : '#'" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-neutral-800 hover:bg-neutral-700 focus:outline-none"
+              :class="{ 'opacity-50 cursor-not-allowed': !isValidUrl(project.externalLinks.githubRepo) }"
+              :tabindex="isValidUrl(project.externalLinks.githubRepo) ? 0 : -1"
+            >
+              <span class="mdi mdi-open-in-new mr-2"></span>
+              View Repository
+            </a>
+          </div>
+          
+          <!-- Figma Design -->
+          <div v-if="project.externalLinks.figmaLink" class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+            <div class="h-16 w-16 rounded-xl bg-pink-100 flex items-center justify-center mb-4">
+              <span class="mdi mdi-figma text-3xl text-pink-600"></span>
+            </div>
+            <h3 class="text-lg font-medium text-neutral-800 mb-1">Figma Design</h3>
+            <p class="text-sm text-neutral-600 mb-4">Access the project's design files in Figma</p>
+            <div class="text-sm text-neutral-500 bg-neutral-50 p-3 rounded-md mb-4 break-all">
+              {{ project.externalLinks.figmaLink }}
+            </div>
+            <a 
+              :href="isValidUrl(project.externalLinks.figmaLink) ? project.externalLinks.figmaLink : '#'" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-pink-600 hover:bg-pink-700 focus:outline-none"
+              :class="{ 'opacity-50 cursor-not-allowed': !isValidUrl(project.externalLinks.figmaLink) }"
+              :tabindex="isValidUrl(project.externalLinks.figmaLink) ? 0 : -1"
+            >
+              <span class="mdi mdi-open-in-new mr-2"></span>
+              View Design
+            </a>
+          </div>
+          
+          <!-- Jira Project -->
+          <div v-if="project.externalLinks.jiraProject" class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+            <div class="h-16 w-16 rounded-xl bg-blue-100 flex items-center justify-center mb-4">
+              <span class="mdi mdi-jira text-3xl text-blue-600"></span>
+            </div>
+            <h3 class="text-lg font-medium text-neutral-800 mb-1">Jira Project</h3>
+            <p class="text-sm text-neutral-600 mb-4">Access the project's tasks and tracking in Jira</p>
+            <div class="text-sm text-neutral-500 bg-neutral-50 p-3 rounded-md mb-4 break-all">
+              {{ project.externalLinks.jiraProject }}
+            </div>
+            <a 
+              :href="isValidUrl(project.externalLinks.jiraProject) ? project.externalLinks.jiraProject : '#'" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
+              :class="{ 'opacity-50 cursor-not-allowed': !isValidUrl(project.externalLinks.jiraProject) }"
+              :tabindex="isValidUrl(project.externalLinks.jiraProject) ? 0 : -1"
+            >
+              <span class="mdi mdi-open-in-new mr-2"></span>
+              View Jira Board
+            </a>
+          </div>
+          
+          <!-- No external links placeholder -->
+          <div v-if="!project.externalLinks.githubRepo && !project.externalLinks.figmaLink && !project.externalLinks.jiraProject" 
+               class="col-span-full bg-neutral-50 rounded-lg p-8 text-center border border-dashed border-neutral-300">
+            <div class="h-16 w-16 rounded-full bg-neutral-200 mx-auto flex items-center justify-center mb-3">
+              <span class="mdi mdi-link-variant-off text-2xl text-neutral-400"></span>
+            </div>
+            <h4 class="text-neutral-600 font-medium mb-2">No External Links Added</h4>
+            <p class="text-neutral-500 text-sm max-w-md mx-auto">
+              External links to GitHub, Figma, or Jira help team members access important project resources.
+              {{ canEdit ? 'Click "Edit Project" to add external links to this project.' : '' }}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
+
+<style>
+/* Add styles for the enhanced form UI */
+.form-tab-enter-active,
+.form-tab-leave-active {
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.form-tab-enter-from,
+.form-tab-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+/* Styles for range input */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 7px;
+  background: #e5e7eb;
+  border-radius: 5px;
+  background-image: linear-gradient(#4f46e5, #4f46e5);
+  background-repeat: no-repeat;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  background: #4f46e5;
+  cursor: pointer;
+  box-shadow: 0 0 2px 0 #555;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  box-shadow: none;
+  border: none;
+  background: transparent;
+}
+
+/* Additional hover effects */
+.form-card-hover {
+  transition: all 0.3s ease;
+}
+
+.form-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* External Links Card Styles */
+.external-link-card {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.external-link-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* GitHub specific styling */
+.github-link {
+  border-left-color: #24292e;
+}
+
+/* Figma specific styling */
+.figma-link {
+  border-left-color: #f24e1e;
+}
+
+/* Jira specific styling */
+.jira-link {
+  border-left-color: #0052cc;
+}
+</style>
