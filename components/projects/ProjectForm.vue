@@ -1,5 +1,7 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { useUsersStore } from '~/stores/users';
+import UserSelect from '~/components/common/UserSelect.vue';
 
 const props = defineProps({
   initialData: {
@@ -41,6 +43,9 @@ const props = defineProps({
 
 const emit = defineEmits(['submit', 'cancel']);
 
+// Initialize users store
+const usersStore = useUsersStore();
+
 // Form data
 const formData = ref({...props.initialData});
 
@@ -68,15 +73,6 @@ const activeTab = ref('info'); // For tabs in certain sections
 const showFormValidationTip = ref(false);
 const formSubmitAttempted = ref(false);
 
-// Team members (in a real app, this would come from an API)
-const teamMembers = [
-  'John Doe',
-  'Jane Smith',
-  'Robert Johnson',
-  'Sarah Williams',
-  'Michael Brown'
-];
-
 // Project status options
 const statusOptions = ['Ongoing', 'Completed', 'On Hold'];
 
@@ -89,12 +85,33 @@ const categoryOptions = ['Development', 'Design', 'Marketing', 'Research', 'Supp
 // Status Phase options
 const statusPhaseOptions = ['Planning', 'Development', 'Testing', 'Deployment', 'Maintenance'];
 
+// Add function to ensure dropdown visibility when team section is opened
+const ensureTeamSectionVisibility = () => {
+  if (activeSections.teamInfo) {
+    // Scroll the section into view with some delay to allow transitions
+    setTimeout(() => {
+      document.getElementById('section-teamInfo')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }, 100);
+  }
+};
+
 // Toggle section visibility with animation
 const toggleSection = (section) => {
   activeSections.value[section] = !activeSections.value[section];
   
   // Enable transition effect
   sectionTransitions.value[section] = true;
+  
+  // For team section, remove any height constraints temporarily
+  if (section === 'teamInfo' && activeSections.value[section]) {
+    const teamSection = document.getElementById(`section-${section}`);
+    if (teamSection) {
+      teamSection.style.overflow = 'visible';
+    }
+  }
   
   // If opening a section, scroll to it
   if (activeSections.value[section]) {
@@ -103,6 +120,11 @@ const toggleSection = (section) => {
         behavior: 'smooth',
         block: 'start'
       });
+      
+      // Additional handling for team section
+      if (section === 'teamInfo') {
+        ensureTeamSectionVisibility();
+      }
     }, 100);
   }
 };
@@ -202,7 +224,21 @@ const showValidationTip = () => {
 watch(() => formData.value.initiallyRaisedOn, calculatePendingDays);
 
 // Initialize component
-onMounted(() => {
+onMounted(async () => {
+  // Ensure users are loaded with a more robust approach
+  if (usersStore.users.length === 0 || usersStore.error) {
+    try {
+      await usersStore.fetchUsers();
+      console.log('Users loaded successfully:', usersStore.users.length);
+      console.log('Available users:', usersStore.users); // Log all available users
+    } catch (error) {
+      console.error('Failed to load users in ProjectForm:', error);
+    }
+  } else {
+    console.log('Users already loaded:', usersStore.users.length);
+    console.log('Available users:', usersStore.users); // Log all available users
+  }
+  
   // Calculate pending days on initial load
   calculatePendingDays();
   
@@ -228,6 +264,15 @@ const handleSubmit = () => {
 const handleCancel = () => {
   emit('cancel');
 };
+
+// Add debugging function to check available user roles
+const availableRoles = computed(() => {
+  const roles = new Set();
+  usersStore.users.forEach(user => {
+    if (user.role) roles.add(user.role);
+  });
+  return Array.from(roles);
+});
 </script>
 
 <template>
@@ -252,7 +297,6 @@ const handleCancel = () => {
                   activeSections.basicInfo ? 'mdi-chevron-up transform rotate-0' : 'mdi-chevron-down transform rotate-0']"
         ></span>
       </div>
-      
       <div 
         v-show="activeSections.basicInfo" 
         :class="['p-6 space-y-6 border-t border-neutral-100 bg-white transition-all duration-300', 
@@ -281,7 +325,6 @@ const handleCancel = () => {
             </span>
           </div>
         </div>
-        
         <!-- Category & Status: Three columns on wide screens -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- Category -->
@@ -313,7 +356,6 @@ const handleCancel = () => {
               </span>
             </div>
           </div>
-          
           <!-- Status -->
           <div class="transition-all duration-200 hover:bg-neutral-50 p-4 rounded-md -mx-3">
             <label for="project-status" class="block text-sm font-medium text-neutral-700">Status</label>
@@ -342,7 +384,6 @@ const handleCancel = () => {
               </div>
             </div>
           </div>
-          
           <!-- Priority moved to same row for better layout on wider screens -->
           <div class="transition-all duration-200 hover:bg-neutral-50 p-4 rounded-md -mx-3">
             <label class="block text-sm font-medium text-neutral-700 mb-2">Priority</label>
@@ -385,7 +426,6 @@ const handleCancel = () => {
             </span>
           </div>
         </div>
-        
         <!-- Progress with enhanced interaction - expanded for wider form -->
         <div class="bg-neutral-50 rounded-md p-5 transition-all duration-200 hover:bg-neutral-100">
           <div class="flex justify-between items-center mb-3">
@@ -410,7 +450,7 @@ const handleCancel = () => {
                 :class="['h-4 rounded-full transition-all duration-300', progressColor]"
                 :style="`width: ${formData.progress}%`"
               ></div>
-            </div>
+            </div> 
             <input
               id="project-progress"
               v-model="formData.progress"
@@ -434,7 +474,6 @@ const handleCancel = () => {
         </div>
       </div>
     </div>
-    
     <!-- Timeline Section -->
     <div id="section-timeline" class="bg-white rounded-lg shadow-md border border-neutral-100 overflow-hidden transition-all duration-300 hover:shadow-lg">
       <div 
@@ -455,7 +494,6 @@ const handleCancel = () => {
                   activeSections.timeline ? 'mdi-chevron-up transform rotate-0' : 'mdi-chevron-down transform rotate-0']"
         ></span>
       </div>
-      
       <div 
         v-show="activeSections.timeline" 
         :class="['p-6 space-y-6 border-t border-neutral-100 bg-white transition-all duration-300', 
@@ -467,7 +505,6 @@ const handleCancel = () => {
             <h4 class="text-sm font-medium text-neutral-800">Project Timeline</h4>
             <span class="text-xs text-primary-600 font-medium">{{ estimatedDays }} days</span>
           </div>
-          
           <!-- Start & End Date: Three columns on wider screens -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <!-- Start Date -->
@@ -492,7 +529,6 @@ const handleCancel = () => {
                 </span>
               </div>
             </div>
-            
             <!-- End Date -->
             <div class="transition-all duration-200 hover:bg-white rounded-md p-3">
               <label for="project-end-date" class="block text-sm font-medium text-neutral-700 flex items-center gap-1">
@@ -515,7 +551,6 @@ const handleCancel = () => {
                 </span>
               </div>
             </div>
-            
             <!-- Estimated Duration - moved to same row for better layout -->
             <div class="transition-all duration-200 hover:bg-white rounded-md p-3 flex flex-col justify-center">
               <label class="block text-sm font-medium text-neutral-700 mb-2">Estimated Duration</label>
@@ -526,7 +561,6 @@ const handleCancel = () => {
             </div>
           </div>
         </div>
-        
         <!-- Timeline visualization - enhanced for wider form -->
         <div class="relative pt-8 pb-4" v-if="formData.startDate && formData.endDate">
           <div class="absolute left-0 right-0 top-0 flex justify-between px-6">
@@ -534,7 +568,7 @@ const handleCancel = () => {
             <div class="text-sm text-neutral-500">End</div>
           </div>
           <div class="h-5 bg-neutral-100 rounded-full overflow-hidden relative">
-            <div
+            <div 
               class="absolute h-full bg-primary-500 rounded-full"
               style="left: 0%; width: 100%;"
             ></div>
@@ -546,9 +580,8 @@ const handleCancel = () => {
         </div>
       </div>
     </div>
-    
     <!-- Team Information Section -->
-    <div id="section-teamInfo" class="bg-white rounded-lg shadow-md border border-neutral-100 overflow-hidden transition-all duration-300 hover:shadow-lg">
+    <div id="section-teamInfo" class="bg-white rounded-lg shadow-md border border-neutral-100 overflow-visible transition-all duration-300 hover:shadow-lg">
       <div 
         class="flex items-center justify-between cursor-pointer p-5 bg-gradient-to-r from-white to-neutral-50" 
         @click="toggleSection('teamInfo')"
@@ -567,104 +600,65 @@ const handleCancel = () => {
                   activeSections.teamInfo ? 'mdi-chevron-up transform rotate-0' : 'mdi-chevron-down transform rotate-0']"
         ></span>
       </div>
-      
       <div 
         v-show="activeSections.teamInfo" 
-        :class="['p-6 space-y-6 border-t border-neutral-100 bg-white transition-all duration-300', 
-                 sectionTransitions.teamInfo ? 'opacity-100 max-h-800px' : 'opacity-0 max-h-0']"
+        :class="[
+          'p-6 space-y-6 border-t border-neutral-100 bg-white transition-all duration-300', 
+          sectionTransitions.teamInfo ? 'opacity-100' : 'opacity-0',
+          'overflow-visible' // Ensure overflow is visible
+        ]"
+        style="position: relative; z-index: 10;"
       >
-        <!-- Assigned To -->
+        <!-- Project Lead (Assigned To) - Modified to not filter by role -->
         <div class="transition-all duration-200 hover:bg-neutral-50 p-4 rounded-md">
-          <label for="project-assignee" class="block text-sm font-medium text-neutral-700">Project Lead</label>
-          <div class="relative mt-3">
-            <div class="flex flex-wrap gap-3">
-              <div 
-                v-for="member in teamMembers" 
-                :key="member" 
-                class="relative"
-              >
-                <input 
-                  type="radio" 
-                  :id="`lead-${member.replace(' ', '-')}`" 
-                  :value="member" 
-                  v-model="formData.assignedTo"
-                  class="sr-only peer" 
-                  required
-                />
-                <label 
-                  :for="`lead-${member.replace(' ', '-')}`" 
-                  :class="[
-                    'inline-flex items-center px-4 py-2 rounded-full border cursor-pointer text-sm transition-all duration-200',
-                    formData.assignedTo === member ? 
-                      'bg-primary-50 text-primary-800 border-primary-200 shadow-sm' : 
-                      'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
-                  ]"
-                >
-                  <span class="mdi mdi-account-circle mr-2 text-lg"
-                    :class="formData.assignedTo === member ? 'text-primary-500' : 'text-neutral-400'"
-                  ></span>
-                  {{ member }}
-                </label>
-              </div>
-            </div>
+          <label class="block text-sm font-medium text-neutral-700">Project Lead</label>
+          <div class="relative mt-3" style="z-index: 30;">
+            <!-- Removed the filterRole prop or set to more general filter -->
+            <UserSelect
+              v-model="formData.assignedTo"
+              :required="true"
+              label=""
+              placeholder="Select project lead"
+              :filterRole="''"
+            />
             <span v-if="invalidFields.includes('assignedTo') && formSubmitAttempted" class="text-xs text-red-500 mt-2 block">
               Project lead is required
             </span>
+            <!-- Debug info to see what roles are available -->
+            <div v-if="usersStore.users.length > 0" class="mt-2 text-xs text-neutral-500">
+              Available roles: {{ availableRoles.join(', ') || 'None' }}
+            </div>
           </div>
         </div>
-        
-        <!-- Team Members with modern checkbox style - updated for wider layout -->
+        <!-- Team Members Selection - With higher z-index -->
         <div class="mt-6 bg-neutral-50 p-5 rounded-lg">
           <label class="block text-sm font-medium text-neutral-700 mb-4 flex items-center gap-2">
             <span class="mdi mdi-account-multiple text-primary-600"></span>
             Team Members
           </label>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            <div 
-              v-for="member in teamMembers"
-              :key="member"
-              class="flex items-center space-x-3 p-3 hover:bg-white rounded-md transition-all duration-200"
-            >
-              <div class="relative inline-flex items-center">
-                <input
-                  :id="`team-member-${member.replace(' ', '-')}`"
-                  type="checkbox"
-                  :value="member"
-                  v-model="formData.team"
-                  class="h-4 w-4 opacity-0 absolute"
-                />
-                <div 
-                  class="h-5 w-5 border rounded flex items-center justify-center"
-                  :class="formData.team.includes(member) ? 'bg-primary-500 border-primary-500' : 'border-neutral-300'"
-                >
-                  <span 
-                    v-if="formData.team.includes(member)" 
-                    class="mdi mdi-check text-white text-sm"
-                  ></span>
-                </div>
-                <label :for="`team-member-${member.replace(' ', '-')}`" class="ml-2 text-sm text-neutral-700 cursor-pointer">
-                  {{ member }}
-                </label>
-              </div>
-            </div>
+          <div style="position: relative; z-index: 20;"> <!-- Higher z-index for team members dropdown -->
+            <UserSelect
+              v-model="formData.team"
+              multiple
+              label=""
+              placeholder="Select team members"
+            />
           </div>
         </div>
-        
         <!-- Team summary - more room for badges on wider form -->
-        <div class="bg-white border border-neutral-200 rounded-lg p-4 mt-5" v-if="formData.team.length > 0">
+        <div class="bg-white border border-neutral-200 rounded-lg p-4 mt-5" v-if="formData.team && formData.team.length > 0">
           <h4 class="text-sm font-medium text-neutral-700 mb-3">Team Summary</h4>
           <div class="flex flex-wrap gap-2">
-            <div v-for="member in formData.team" :key="`badge-${member}`" 
+            <div v-for="memberId in formData.team" :key="`badge-${memberId}`" 
               class="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-700 rounded-full text-sm font-medium"
             >
               <span class="mdi mdi-account-circle"></span>
-              {{ member }}
+              {{ usersStore.getUserDisplayName(memberId) }}
             </div>
           </div>
         </div>
       </div>
     </div>
-    
     <!-- Additional Info Section -->
     <div id="section-additional" class="bg-white rounded-lg shadow-md border border-neutral-100 overflow-hidden transition-all duration-300 hover:shadow-lg">
       <div 
@@ -685,7 +679,6 @@ const handleCancel = () => {
                   activeSections.additional ? 'mdi-chevron-up transform rotate-0' : 'mdi-chevron-down transform rotate-0']"
         ></span>
       </div>
-      
       <div 
         v-show="activeSections.additional" 
         :class="['p-6 space-y-6 border-t border-neutral-100 bg-white transition-all duration-300', 
@@ -718,7 +711,6 @@ const handleCancel = () => {
             </button>
           </div>
         </div>
-        
         <!-- Remarks tab content - taller textareas for wider form -->
         <div v-show="activeTab === 'remarks'" class="transition-opacity duration-300">
           <div class="bg-neutral-50 rounded-lg p-5">
@@ -734,7 +726,6 @@ const handleCancel = () => {
             </div>
           </div>
         </div>
-        
         <!-- Notes tab content - taller textareas for wider form -->
         <div v-show="activeTab === 'notes'" class="transition-opacity duration-300">
           <div class="bg-neutral-50 rounded-lg p-5">
@@ -752,7 +743,6 @@ const handleCancel = () => {
         </div>
       </div>
     </div>
-    
     <!-- Project Details Section - New section for additional fields - enhanced for wider form -->
     <div id="section-projectDetails" class="bg-white rounded-lg shadow-md border border-neutral-100 overflow-hidden transition-all duration-300 hover:shadow-lg">
       <div 
@@ -773,7 +763,6 @@ const handleCancel = () => {
                   activeSections.projectDetails ? 'mdi-chevron-up transform rotate-0' : 'mdi-chevron-down transform rotate-0']"
         ></span>
       </div>
-      
       <div 
         v-show="activeSections.projectDetails" 
         :class="['p-6 space-y-6 border-t border-neutral-100 bg-white transition-all duration-300', 
@@ -797,7 +786,6 @@ const handleCancel = () => {
               />
             </div>
           </div>
-          
           <!-- Status Phase -->
           <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm border border-neutral-200">
             <label for="project-status-phase" class="block text-sm font-medium text-neutral-700 flex items-center gap-2 mb-2">
@@ -820,7 +808,6 @@ const handleCancel = () => {
               </div>
             </div>
           </div>
-          
           <!-- Pending days indicator - moved to same row for better layout -->
           <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm border border-neutral-200">
             <label class="block text-sm font-medium text-neutral-700 flex items-center gap-2 mb-2">
@@ -836,14 +823,12 @@ const handleCancel = () => {
             <p class="text-xs text-neutral-500 mt-2 text-center">Auto-calculated</p>
           </div>
         </div>
-        
         <!-- Modern timeline card for deadline & raised date - two columns for wider layout-->
         <div class="bg-white rounded-lg shadow-sm p-5 border border-neutral-100">
           <h4 class="text-sm font-medium text-neutral-700 mb-4 flex items-center gap-2">
             <span class="mdi mdi-clock-time-four-outline text-primary-600"></span>
             Time Tracking
           </h4>
-          
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Deadline -->
             <div class="transition-all duration-200 hover:bg-neutral-50 rounded-md p-4">
@@ -860,7 +845,6 @@ const handleCancel = () => {
                 />
               </div>
             </div>
-            
             <!-- Initially Raised On -->
             <div class="transition-all duration-200 hover:bg-neutral-50 rounded-md p-4">
               <label for="project-raised-on" class="block text-sm font-medium text-neutral-700">Initially Raised On</label>
@@ -878,82 +862,36 @@ const handleCancel = () => {
             </div>
           </div>
         </div>
-        
         <!-- Responsible Person & Developers Card - enhanced for wider layout -->
         <div class="bg-white rounded-lg shadow-sm p-5 border border-neutral-100">
           <h4 class="text-sm font-medium text-neutral-700 mb-4">People</h4>
           
-          <!-- Responsible Person with avatar style selection - more items per row -->
+          <!-- Responsible Person - Using UserSelect component -->
           <div class="mb-6">
-            <label for="project-responsible" class="block text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
+            <label class="block text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
               <span class="mdi mdi-account-check text-primary-600"></span>
               Responsible Person
             </label>
-            <div class="flex flex-wrap gap-4">
-              <div 
-                v-for="member in teamMembers"
-                :key="`resp-${member}`"
-                class="relative"
-              >
-                <input 
-                  type="radio" 
-                  :id="`resp-member-${member.replace(' ', '-')}`" 
-                  :value="member" 
-                  v-model="formData.responsiblePerson"
-                  class="sr-only peer" 
-                />
-                <label 
-                  :for="`resp-member-${member.replace(' ', '-')}`" 
-                  :class="[
-                    'flex flex-col items-center px-4 py-3 rounded-lg border cursor-pointer text-sm transition-all duration-200',
-                    formData.responsiblePerson === member ? 
-                      'bg-primary-50 text-primary-800 border-primary-300' : 
-                      'bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50'
-                  ]"
-                >
-                  <div :class="[
-                    'h-10 w-10 rounded-full flex items-center justify-center text-lg mb-1',
-                    formData.responsiblePerson === member ? 'bg-primary-200 text-primary-700' : 'bg-neutral-100 text-neutral-500'
-                  ]">
-                    <span class="mdi mdi-account"></span>
-                  </div>
-                  <span class="text-center">{{ member }}</span>
-                </label>
-              </div>
-            </div>
+            <UserSelect
+              v-model="formData.responsiblePerson"
+              placeholder="Select responsible person"
+              :filterRole="null"
+            />
           </div>
-          
-          <!-- Developers - more columns on wider screens -->
+          <!-- Developers - Using UserSelect component for multiple selection -->
           <div class="mt-6">
             <label class="block text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
               <span class="mdi mdi-laptop text-primary-600"></span>
               Developers
             </label>
-            <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-100">
-              <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                <div 
-                  v-for="member in teamMembers"
-                  :key="`dev-${member}`"
-                  class="flex items-center gap-3 bg-white p-3 rounded-md transition-all duration-200 hover:bg-neutral-50 cursor-pointer"
-                  @click="() => {
-                    const index = formData.developers.indexOf(member);
-                    if (index === -1) formData.developers.push(member);
-                    else formData.developers.splice(index, 1);
-                  }"
-                >
-                  <div :class="[
-                    'h-5 w-5 rounded-md flex items-center justify-center border',
-                    formData.developers.includes(member) ? 'bg-primary-500 border-primary-600' : 'bg-white border-neutral-300'
-                  ]">
-                    <span v-if="formData.developers.includes(member)" class="mdi mdi-check text-white text-sm"></span>
-                  </div>
-                  <label class="text-sm cursor-pointer flex-1">{{ member }}</label>
-                </div>
-              </div>
-            </div>
+            <UserSelect
+              v-model="formData.developers"
+              multiple
+              placeholder="Select developers"
+              :filterRole="null"
+            />
           </div>
         </div>
-        
         <!-- Blockers and Feedback Card with tabs - wider tabs with more space -->
         <div class="bg-white rounded-lg shadow-sm p-5 border border-neutral-100">
           <div class="border-b border-neutral-200 pb-2">
@@ -993,7 +931,6 @@ const handleCancel = () => {
               </button>
             </div>
           </div>
-          
           <!-- Content sections with taller textareas for wider form -->
           <div v-show="activeTab === 'blockers'" class="py-5">
             <div class="bg-neutral-50 rounded-lg p-5">
@@ -1010,7 +947,6 @@ const handleCancel = () => {
               </div>
             </div>
           </div>
-          
           <div v-show="activeTab === 'feedback'" class="py-5">
             <div class="bg-neutral-50 rounded-lg p-5">
               <label for="project-feedback" class="block text-sm font-medium text-neutral-700 mb-3">Feedback for blockers</label>
@@ -1026,7 +962,6 @@ const handleCancel = () => {
               </div>
             </div>
           </div>
-          
           <div v-show="activeTab === 'comments'" class="py-5">
             <div class="bg-neutral-50 rounded-lg p-5">
               <label for="project-comments" class="block text-sm font-medium text-neutral-700 mb-3">Project comments</label>
@@ -1045,7 +980,6 @@ const handleCancel = () => {
         </div>
       </div>
     </div>
-    
     <!-- Form Actions - wider buttons for the expanded form -->
     <div class="sticky bottom-0 bg-white p-5 rounded-lg shadow-lg border border-neutral-100 flex justify-between items-center z-10">
       <div class="text-sm">
@@ -1152,5 +1086,21 @@ input[type=range]::-moz-range-thumb {
   border-radius: 50%;
   background: #3b82f6;
   cursor: pointer;
+}
+
+/* Add this to prevent overflow issues with dropdowns */
+#section-teamInfo {
+  overflow: visible !important;
+}
+
+/* Remove height constraints for active sections */
+.max-h-800px {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+/* Ensure z-index works correctly */
+.relative {
+  position: relative;
 }
 </style>
