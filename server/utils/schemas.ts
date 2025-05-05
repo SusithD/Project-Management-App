@@ -5,15 +5,24 @@ import { ObjectId, Int32 } from 'mongodb';
 export const COLLECTIONS = {
   PROJECTS: 'projects',
   USERS: 'users',
-  FILES: 'files'
+  FILES: 'files',
+  TASKS: 'tasks'
 };
 
 // Project update interface
 export interface ProjectUpdate {
   id: string;
-  message: string;
+  content: string;
   date: string;
-  user: string;
+  author: string;
+}
+
+// Project file interface
+export interface ProjectFile {
+  name: string;
+  size: string;
+  uploadedOn: string;
+  uploadedBy: string;
 }
 
 // Project interface
@@ -34,8 +43,6 @@ export interface Project {
   team: string[];
   updates?: ProjectUpdate[];
   _id?: ObjectId;
-  
-  // New fields
   company?: string;
   statusPhase?: string;
   deadline?: string;
@@ -46,6 +53,13 @@ export interface Project {
   initiallyRaisedOn?: string;
   pendingDays?: number | Int32;
   feedbackForBlockers?: string;
+  createdBy: string;
+  externalLinks: {
+    githubRepo: string;
+    figmaLink: string;
+    jiraProject: string;
+  };
+  files?: ProjectFile[];
 }
 
 // User interface
@@ -139,7 +153,6 @@ export const projectValidationSchema = {
           },
           description: 'must be an array of strings'
         },
-        // New fields
         company: {
           bsonType: 'string',
           description: 'must be a string if present'
@@ -187,13 +200,13 @@ export const projectValidationSchema = {
           bsonType: 'array',
           items: {
             bsonType: 'object',
-            required: ['id', 'message', 'date', 'user'],
+            required: ['id', 'content', 'date', 'author'],
             properties: {
               id: {
                 bsonType: 'string',
                 description: 'must be a string and is required'
               },
-              message: {
+              content: {
                 bsonType: 'string',
                 description: 'must be a string and is required'
               },
@@ -201,9 +214,50 @@ export const projectValidationSchema = {
                 bsonType: 'string',
                 description: 'must be a string and is required'
               },
-              user: {
+              author: {
                 bsonType: 'string',
                 description: 'must be a string and is required'
+              }
+            }
+          }
+        },
+        externalLinks: {
+          bsonType: 'object',
+          properties: {
+            githubRepo: {
+              bsonType: 'string',
+              description: 'must be a string'
+            },
+            figmaLink: {
+              bsonType: 'string',
+              description: 'must be a string'
+            },
+            jiraProject: {
+              bsonType: 'string',
+              description: 'must be a string'
+            }
+          }
+        },
+        files: {
+          bsonType: 'array',
+          items: {
+            bsonType: 'object',
+            properties: {
+              name: {
+                bsonType: 'string',
+                description: 'must be a string'
+              },
+              size: {
+                bsonType: 'string',
+                description: 'must be a string'
+              },
+              uploadedOn: {
+                bsonType: 'string',
+                description: 'must be a string'
+              },
+              uploadedBy: {
+                bsonType: 'string',
+                description: 'must be a string'
               }
             }
           }
