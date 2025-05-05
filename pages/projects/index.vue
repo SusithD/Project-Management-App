@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useProjectsStore } from '~/stores/projects';
 import { useNotificationsStore } from '~/stores/notifications';
+import { useUsersStore } from '~/stores/users';
 import NewProjectModal from '~/components/projects/NewProjectModal.vue';
 
 // Define layout
@@ -12,6 +13,7 @@ definePageMeta({
 // Get projects from store
 const projectsStore = useProjectsStore();
 const notificationsStore = useNotificationsStore();
+const usersStore = useUsersStore();
 const isNewProjectModalOpen = ref(false);
 const isLoading = ref(true);
 
@@ -19,11 +21,20 @@ const isLoading = ref(true);
 onMounted(async () => {
   try {
     isLoading.value = true;
+    await usersStore.fetchUsers();
     await projectsStore.fetchProjects();
   } finally {
     isLoading.value = false;
   }
 });
+
+// Helper function to get user name from ID
+const getUserName = (userId) => {
+  if (!userId) return 'Not assigned';
+  
+  const user = usersStore.users.find(user => user.id === userId);
+  return user ? user.name : userId;
+};
 
 // Filters
 const searchQuery = ref('');
@@ -32,8 +43,15 @@ const assigneeFilter = ref('all');
 
 // Get unique assignees for filter dropdown
 const uniqueAssignees = computed(() => {
-  const assignees = [...new Set(projectsStore.projects.map(p => p.assignedTo))];
-  return assignees.sort();
+  const assigneeIds = [...new Set(projectsStore.projects.map(p => p.assignedTo))];
+  
+  // Map the IDs to objects with id and display name
+  return assigneeIds
+    .map(id => ({
+      id,
+      name: getUserName(id)
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 });
 
 // Filter projects based on search and filter criteria
@@ -218,8 +236,8 @@ const clearFilters = () => {
             class="w-full py-2 px-3 rounded-md bg-white border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           >
             <option value="all">All Assignees</option>
-            <option v-for="assignee in uniqueAssignees" :key="assignee" :value="assignee">
-              {{ assignee }}
+            <option v-for="assignee in uniqueAssignees" :key="assignee.id" :value="assignee.id">
+              {{ assignee.name }}
             </option>
           </select>
         </div>
@@ -294,7 +312,7 @@ const clearFilters = () => {
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap hidden md:table-cell">
-                <div class="text-sm text-neutral-700">{{ project.assignedTo }}</div>
+                <div class="text-sm text-neutral-700">{{ getUserName(project.assignedTo) }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap hidden lg:table-cell">
                 <div class="text-sm text-neutral-700">{{ project.startDate }} - {{ project.endDate }}</div>
