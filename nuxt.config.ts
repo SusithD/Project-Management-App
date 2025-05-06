@@ -83,6 +83,7 @@ export default defineNuxtConfig({
     '/dashboard/**': { ssr: false },
     '/projects/**': { ssr: false },
     '/users/**': { ssr: false },
-    '/tasks/**': { ssr: false }
+    '/tasks/**': { ssr: false },
+    '/settings/**': { ssr: false }
   }
 })
