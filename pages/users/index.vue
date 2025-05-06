@@ -178,11 +178,12 @@
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Email</th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Role</th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Joined</th>
+              <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-neutral-200">
             <tr v-if="filteredUsers.length === 0 && !loading">
-              <td colspan="5" class="px-6 py-10 text-center text-neutral-500">
+              <td colspan="6" class="px-6 py-10 text-center text-neutral-500">
                 <div class="flex flex-col items-center">
                   <span class="mdi mdi-account-off text-5xl text-neutral-300 mb-2"></span>
                   <p class="text-lg font-medium">No users found</p>
@@ -215,6 +216,24 @@
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">{{ formatDate(user.createdAt) }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <div class="flex justify-end space-x-2">
+                  <button 
+                    @click="openEditUserModal(user)" 
+                    class="text-primary-600 hover:text-primary-800 transition-colors"
+                    title="Edit User"
+                  >
+                    <span class="mdi mdi-pencil text-lg"></span>
+                  </button>
+                  <button 
+                    @click="confirmDeleteUser(user)" 
+                    class="text-red-600 hover:text-red-800 transition-colors"
+                    title="Delete User"
+                  >
+                    <span class="mdi mdi-delete text-lg"></span>
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -304,6 +323,131 @@
         </form>
       </div>
     </div>
+
+    <!-- Edit User Modal -->
+    <div v-if="showEditUserModal" class="fixed inset-0 bg-black bg-opacity-25 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-auto" @click.stop>
+        <div class="px-6 py-4 border-b border-neutral-200">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-medium text-neutral-900">Edit User</h3>
+            <button @click="showEditUserModal = false" class="text-neutral-400 hover:text-neutral-500 focus:outline-none">
+              <span class="mdi mdi-close text-xl"></span>
+            </button>
+          </div>
+        </div>
+
+        <form @submit.prevent="updateUser" class="px-6 py-4">
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-neutral-700 mb-1">User ID</label>
+            <div class="input-field-readonly w-full px-3 py-2 bg-neutral-50">{{ editingUser.id }}</div>
+          </div>
+          
+          <div class="mb-4">
+            <label for="editName" class="block text-sm font-medium text-neutral-700 mb-1">Full Name</label>
+            <input
+              type="text"
+              id="editName"
+              v-model="editingUser.name"
+              class="input-field w-full"
+              required
+            />
+          </div>
+          
+          <div class="mb-4">
+            <label for="editEmail" class="block text-sm font-medium text-neutral-700 mb-1">Email</label>
+            <input
+              type="email"
+              id="editEmail"
+              v-model="editingUser.email"
+              class="input-field w-full"
+              required
+            />
+          </div>
+          
+          <div class="mb-4">
+            <label for="editRole" class="block text-sm font-medium text-neutral-700 mb-1">Role</label>
+            <select
+              id="editRole"
+              v-model="editingUser.role"
+              class="input-field w-full"
+              required
+            >
+              <option value="">Select a role</option>
+              <option value="Developer">Developer</option>
+              <option value="Business Analyst">Business Analyst</option>
+              <option value="Project Manager">Project Manager</option>
+              <option value="QA Engineer">QA Engineer</option>
+              <option value="HR">HR</option>
+              <option value="Manager">Manager</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          
+          <div class="mt-6 flex justify-end space-x-3">
+            <button
+              type="button"
+              class="px-4 py-2 border border-neutral-300 rounded-md shadow-sm text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+              @click="showEditUserModal = false"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+              :disabled="isSubmitting"
+            >
+              <span class="mdi mdi-loading mdi-spin mr-2" v-if="isSubmitting"></span>
+              {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
+            </button>
+          </div>
+
+          <!-- Error message -->
+          <div v-if="errorMessage" class="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+            <p>{{ errorMessage }}</p>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-25 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full" @click.stop>
+        <div class="px-6 py-4 border-b border-neutral-200">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-medium text-neutral-900">Confirm Deletion</h3>
+            <button @click="showDeleteModal = false" class="text-neutral-400 hover:text-neutral-500 focus:outline-none">
+              <span class="mdi mdi-close text-xl"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="px-6 py-4">
+          <div class="mb-4">
+            <p class="text-neutral-700">Are you sure you want to delete this user?</p>
+            <p class="mt-2 font-medium">{{ userToDelete ? userToDelete.name : '' }}</p>
+            <p class="text-sm text-neutral-500">{{ userToDelete ? userToDelete.email : '' }}</p>
+          </div>
+          
+          <div class="mt-6 flex justify-end space-x-3">
+            <button
+              type="button"
+              class="px-4 py-2 border border-neutral-300 rounded-md shadow-sm text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+              @click="showDeleteModal = false"
+            >
+              Cancel
+            </button>
+            <button
+              @click="deleteUser"
+              class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+              :disabled="isSubmitting"
+            >
+              <span class="mdi mdi-loading mdi-spin mr-2" v-if="isSubmitting"></span>
+              {{ isSubmitting ? 'Deleting...' : 'Delete User' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -323,18 +467,31 @@ const loading = ref(true);
 const searchQuery = ref('');
 const selectedTab = ref('all');
 
-// Modal state
+// Modal states
 const showAddUserModal = ref(false);
+const showEditUserModal = ref(false);
+const showDeleteModal = ref(false);
 const isSubmitting = ref(false);
 const errorMessage = ref('');
 
-// New user form data
+// User form data
 const newUser = ref({
   id: '',
   name: '',
   email: '',
   role: ''
 });
+
+// Edit user data
+const editingUser = ref({
+  id: '',
+  name: '',
+  email: '',
+  role: ''
+});
+
+// User to delete
+const userToDelete = ref(null);
 
 // Watch for name changes to auto-generate ID
 watch(() => newUser.value.name, (newName) => {
@@ -475,6 +632,28 @@ const openAddUserModal = () => {
   showAddUserModal.value = true;
 };
 
+// Open edit user modal
+const openEditUserModal = (user) => {
+  // Clone user to prevent direct object reference
+  editingUser.value = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatar: user.avatar,
+    _id: user._id
+  };
+  
+  errorMessage.value = '';
+  showEditUserModal.value = true;
+};
+
+// Confirm delete user
+const confirmDeleteUser = (user) => {
+  userToDelete.value = user;
+  showDeleteModal.value = true;
+};
+
 // Add new user
 const addUser = async () => {
   try {
@@ -515,6 +694,77 @@ const addUser = async () => {
     console.error('Error adding user:', error);
   } finally {
     isSubmitting.value = false;
+  }
+};
+
+// Update existing user
+const updateUser = async () => {
+  try {
+    isSubmitting.value = true;
+    errorMessage.value = '';
+    
+    const response = await fetch(`/api/users/${editingUser.value.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(editingUser.value)
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to update user');
+    }
+    
+    // Update user in the list
+    const index = users.value.findIndex(u => u.id === editingUser.value.id);
+    if (index !== -1) {
+      users.value[index] = data;
+    }
+    
+    // Close modal and show success message
+    showEditUserModal.value = false;
+    toast.success('User updated successfully');
+    
+  } catch (error) {
+    errorMessage.value = error.message;
+    console.error('Error updating user:', error);
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+// Delete user
+const deleteUser = async () => {
+  if (!userToDelete.value) return;
+  
+  try {
+    isSubmitting.value = true;
+    
+    const response = await fetch(`/api/users/${userToDelete.value.id}`, {
+      method: 'DELETE'
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to delete user');
+    }
+    
+    // Remove user from the list
+    users.value = users.value.filter(u => u.id !== userToDelete.value.id);
+    
+    // Close modal and show success message
+    showDeleteModal.value = false;
+    toast.success('User deleted successfully');
+    
+  } catch (error) {
+    toast.error(error.message || 'An error occurred while deleting the user');
+    console.error('Error deleting user:', error);
+  } finally {
+    isSubmitting.value = false;
+    userToDelete.value = null;
   }
 };
 
@@ -578,6 +828,16 @@ onMounted(() => {
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+.input-field-readonly {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background-color: #f3f4f6;
+  color: #374151;
 }
 
 /* Animation for hover effects */
