@@ -234,18 +234,7 @@
         </div>
 
         <form @submit.prevent="addUser" class="px-6 py-4">
-          <div class="mb-4">
-            <label for="userId" class="block text-sm font-medium text-neutral-700 mb-1">User ID</label>
-            <input
-              type="text"
-              id="userId"
-              v-model="newUser.id"
-              class="input-field w-full"
-              placeholder="e.g. mb001"
-              required
-            />
-            <p class="text-xs text-neutral-500 mt-1">Format: initials followed by a number (e.g. mb001)</p>
-          </div>
+          <!-- User ID field removed, will be auto-generated based on name -->
           
           <div class="mb-4">
             <label for="name" class="block text-sm font-medium text-neutral-700 mb-1">Full Name</label>
@@ -319,7 +308,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 
 definePageMeta({
   layout: 'dashboard'
@@ -346,6 +335,46 @@ const newUser = ref({
   email: '',
   role: ''
 });
+
+// Watch for name changes to auto-generate ID
+watch(() => newUser.value.name, (newName) => {
+  if (newName) {
+    newUser.value.id = generateUserId(newName);
+  }
+});
+
+// Generate user ID based on name (initials followed by a number)
+const generateUserId = (fullName) => {
+  if (!fullName) return '';
+  
+  // Extract initials from the name
+  const nameParts = fullName.trim().split(/\s+/);
+  let initials = nameParts.map(part => part.charAt(0).toLowerCase()).join('');
+  
+  // Ensure we have at least two characters for initials
+  if (initials.length < 2 && nameParts[0]) {
+    // If only one name, use the first two letters
+    initials = nameParts[0].substring(0, 2).toLowerCase();
+  }
+  
+  // Find the highest existing ID with these initials
+  const regex = new RegExp(`^${initials}(\\d+)$`, 'i');
+  const existingIds = users.value
+    .map(user => user.id)
+    .filter(id => regex.test(id))
+    .map(id => {
+      const match = id.match(regex);
+      return match ? parseInt(match[1]) : 0;
+    });
+  
+  // Get the next available number
+  const nextNumber = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+  
+  // Format the number with leading zeros (e.g., 001, 002, etc.)
+  const paddedNumber = nextNumber.toString().padStart(3, '0');
+  
+  return `${initials}${paddedNumber}`;
+};
 
 // Computed properties for stats
 const totalUsers = computed(() => users.value.length);
@@ -451,6 +480,11 @@ const addUser = async () => {
   try {
     isSubmitting.value = true;
     errorMessage.value = '';
+    
+    // Ensure the ID is generated if not already set
+    if (!newUser.value.id && newUser.value.name) {
+      newUser.value.id = generateUserId(newUser.value.name);
+    }
     
     const response = await fetch('/api/users', {
       method: 'POST',
