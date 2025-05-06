@@ -42,6 +42,12 @@ const navItems = [
     active: computed(() => router.currentRoute.value.path.startsWith('/tasks'))
   },
   { 
+    label: 'Users', 
+    icon: 'mdi-account-group-outline', 
+    route: '/users',
+    active: computed(() => router.currentRoute.value.path.startsWith('/users'))
+  },
+  { 
     label: 'Reports', 
     icon: 'mdi-chart-box-outline', 
     route: '/reports',
@@ -61,7 +67,8 @@ const toggleMobileMenu = () => {
 };
 
 // Navigate to a route and close mobile menu
-const navigateTo = (route) => {
+// Renamed from navigateTo to navigate to avoid conflicts with Nuxt's built-in navigateTo
+const navigate = (route) => {
   router.push(route);
   isMobileMenuOpen.value = false;
 };
@@ -116,7 +123,7 @@ const handleLogout = () => {
           <ul class="space-y-1 px-2">
             <li v-for="item in navItems" :key="item.label">
               <a 
-                @click.prevent="navigateTo(item.route)" 
+                @click.prevent="navigate(item.route)" 
                 :class="[
                   'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
                   item.active 
@@ -151,7 +158,7 @@ const handleLogout = () => {
           <ul class="space-y-1 px-2">
             <li>
               <a 
-                @click.prevent="navigateTo('/reports')" 
+                @click.prevent="navigate('/reports')" 
                 :class="[
                   'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
                   router.currentRoute.value.path.startsWith('/reports')
@@ -170,7 +177,7 @@ const handleLogout = () => {
             </li>
             <li>
               <a 
-                @click.prevent="navigateTo('/settings')" 
+                @click.prevent="navigate('/settings')" 
                 :class="[
                   'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
                   router.currentRoute.value.path.startsWith('/settings')
@@ -253,7 +260,7 @@ const handleLogout = () => {
           <ul class="space-y-1 px-2">
             <li v-for="item in navItems" :key="item.label">
               <a 
-                @click.prevent="navigateTo(item.route)" 
+                @click.prevent="navigate(item.route)" 
                 :class="[
                   'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
                   item.active 
@@ -288,7 +295,7 @@ const handleLogout = () => {
           <ul class="space-y-1 px-2">
             <li>
               <a 
-                @click.prevent="navigateTo('/reports')" 
+                @click.prevent="navigate('/reports')" 
                 :class="[
                   'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
                   router.currentRoute.value.path.startsWith('/reports')
@@ -307,7 +314,7 @@ const handleLogout = () => {
             </li>
             <li>
               <a 
-                @click.prevent="navigateTo('/settings')" 
+                @click.prevent="navigate('/settings')" 
                 :class="[
                   'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
                   router.currentRoute.value.path.startsWith('/settings')
