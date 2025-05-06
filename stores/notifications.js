@@ -7,7 +7,14 @@ export const useNotificationsStore = defineStore('notifications', {
     config: {
       position: 'top-right', // top-right, top-left, bottom-right, bottom-left, top, bottom
       defaultTimeout: 5000,
-      maxNotifications: 10
+      maxNotifications: 10,
+      closeOnClick: true,
+      pauseOnHover: true,
+      allowDuplicates: false,
+      newestOnTop: true,
+      showProgress: true,
+      swipeToClose: true,
+      backdrop: false // Show backdrop behind notifications
     }
   }),
   
@@ -24,6 +31,13 @@ export const useNotificationsStore = defineStore('notifications', {
      */
     countByType: (state) => (type) => {
       return state.notifications.filter(n => n.type === type).length;
+    },
+
+    /**
+     * Check if a notification with specific message already exists
+     */
+    hasNotification: (state) => (message) => {
+      return state.notifications.some(n => n.message === message);
     }
   },
   
@@ -48,8 +62,14 @@ export const useNotificationsStore = defineStore('notifications', {
      * @param {boolean} [notification.dismissible=true] - Whether the notification can be dismissed manually
      * @param {Array} [notification.actions] - Action buttons that can be shown in the notification
      * @param {boolean} [notification.showTime=true] - Whether to show the timestamp
+     * @param {string} [notification.icon] - Custom icon to use (overrides default)
      */
     add(notification) {
+      // Check for duplicates if not allowed
+      if (!this.config.allowDuplicates && this.hasNotification(notification.message)) {
+        return -1; // Skip adding duplicate
+      }
+
       const id = this.nextId++;
       const defaults = {
         id,
@@ -62,7 +82,13 @@ export const useNotificationsStore = defineStore('notifications', {
       };
       
       const newNotification = { ...defaults, ...notification };
-      this.notifications.unshift(newNotification); // Add to beginning for newest first
+      
+      // Add to beginning or end based on config
+      if (this.config.newestOnTop) {
+        this.notifications.unshift(newNotification);
+      } else {
+        this.notifications.push(newNotification);
+      }
       
       // Auto-dismiss after timeout if specified
       if (newNotification.timeout > 0) {
@@ -206,6 +232,30 @@ export const useNotificationsStore = defineStore('notifications', {
               primary: true
             }
           ],
+          ...options
+        });
+      });
+    },
+
+    /**
+     * Show a notification with a promise that resolves when closed
+     * @param {string} message - Notification message
+     * @param {string} type - Type of notification
+     * @param {Object} options - Additional options
+     * @returns {Promise} Promise that resolves when notification is closed
+     */
+    async prompt(message, options = {}) {
+      return new Promise((resolve) => {
+        const id = this.add({
+          type: options.type || 'info',
+          message,
+          actions: [{
+            text: options.buttonText || 'OK',
+            onClick: () => resolve(true),
+            primary: true
+          }],
+          timeout: options.timeout || 0,
+          onClose: () => resolve(false),
           ...options
         });
       });
