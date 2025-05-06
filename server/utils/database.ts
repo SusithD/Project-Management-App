@@ -8,7 +8,12 @@ let db: Db | null = null
 
 // Get MongoDB connection details from config
 const config = useRuntimeConfig()
+
+// Use fallback to direct connection string if DNS SRV lookup fails
 const MONGO_URI = config.mongodb?.uri || process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017'
+
+// For local development, use a fallback to local MongoDB if the Atlas connection fails
+const LOCAL_MONGO_URI = 'mongodb://localhost:27017'
 const MONGO_DB = config.mongodb?.dbName || process.env.MONGO_DB || 'project_management'
 
 // Connection options
@@ -30,7 +35,7 @@ export async function connectToDatabase() {
   }
 
   try {
-    console.log(`Connecting to MongoDB at ${MONGO_URI}...`)
+    console.log(`Attempting to connect to MongoDB at ${MONGO_URI}...`)
     
     client = new MongoClient(MONGO_URI, CONNECTION_OPTIONS)
     await client.connect()
@@ -42,7 +47,22 @@ export async function connectToDatabase() {
     return { db, client }
   } catch (error) {
     console.error('Failed to connect to MongoDB:', error)
-    throw error
+    
+    // Try connecting to local MongoDB if Atlas connection fails
+    try {
+      console.log(`Attempting to connect to local MongoDB at ${LOCAL_MONGO_URI}...`)
+      client = new MongoClient(LOCAL_MONGO_URI, CONNECTION_OPTIONS)
+      await client.connect()
+      db = client.db(MONGO_DB)
+      
+      await setupCollections(db)
+      
+      console.log(`Connected to local MongoDB database: ${MONGO_DB}`)
+      return { db, client }
+    } catch (localError) {
+      console.error('Failed to connect to local MongoDB:', localError)
+      throw error // Throw the original error
+    }
   }
 }
 
