@@ -81,6 +81,7 @@ export default defineNuxtConfig({
     
     // Protected routes that need authentication
     '/dashboard/**': { ssr: false },
-    '/projects/**': { ssr: false }
+    '/projects/**': { ssr: false },
+    '/users/**': { ssr: false }
   }
 })
