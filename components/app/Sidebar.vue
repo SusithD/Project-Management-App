@@ -47,6 +47,12 @@ const navItems = [
     route: '/users',
     active: computed(() => router.currentRoute.value.path.startsWith('/users'))
   },
+  {
+    label: 'Employee Projects',
+    icon: 'mdi-account-tie',
+    route: '/employees/projects',
+    active: computed(() => router.currentRoute.value.path.startsWith('/employees/projects'))
+  },
   { 
     label: 'Reports', 
     icon: 'mdi-chart-box-outline', 

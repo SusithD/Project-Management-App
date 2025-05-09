@@ -80,10 +80,16 @@ export default defineNuxtConfig({
     '/auth/**': { ssr: false },
     
     // Protected routes that need authentication
+    '/dashboard': { ssr: false },
     '/dashboard/**': { ssr: false },
     '/projects/**': { ssr: false },
     '/users/**': { ssr: false },
     '/tasks/**': { ssr: false },
     '/settings/**': { ssr: false }
+  },
+
+  // Adding an alias for the dashboard
+  alias: {
+    '/dashboard': '~/pages/dashboard.vue'
   }
 })
