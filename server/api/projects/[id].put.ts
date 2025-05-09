@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb'
+import { ObjectId, Int32 } from 'mongodb'
 // Import auth from Nuxt
 import { useRuntimeConfig } from '#imports'
 import { connectToDatabase } from '~/server/utils/database'
@@ -37,6 +37,36 @@ export default defineEventHandler(async (event) => {
     // Current date for lastUpdated
     const currentDate = new Date().toISOString().split('T')[0]
     updateData.lastUpdated = currentDate;
+    
+    // Ensure all integer fields are properly converted to MongoDB Int32
+    if (updateData.progress !== undefined) {
+      updateData.progress = new Int32(parseInt(updateData.progress) || 0);
+    }
+    
+    if (updateData.pendingDays !== undefined) {
+      updateData.pendingDays = new Int32(parseInt(updateData.pendingDays) || 0);
+    }
+    
+    if (updateData.id !== undefined && typeof updateData.id === 'number') {
+      updateData.id = new Int32(updateData.id);
+    }
+    
+    // Ensure status is one of the allowed values in schema
+    if (updateData.status) {
+      // MongoDB schema only allows these values
+      const allowedStatuses = ['Ongoing', 'Completed', 'On Hold'];
+      
+      // If status isn't in allowed list, default to 'Ongoing'
+      if (!allowedStatuses.includes(updateData.status)) {
+        console.warn(`Status '${updateData.status}' not allowed by schema. Defaulting to 'Ongoing'.`);
+        updateData.status = 'Ongoing';
+      }
+    }
+    
+    // Ensure arrays are properly initialized if they don't exist
+    if (updateData.team === undefined) {
+      updateData.team = [];
+    }
     
     // Search by numeric ID or MongoDB ObjectId
     let query;
