@@ -29,6 +29,22 @@ export const useUsersStore = defineStore('users', {
       );
     },
 
+    // Get available developers
+    availableDevelopers: (state) => {
+      return state.users.filter(user => 
+        (user.role === 'Developer' || user.role === 'Lead Developer') &&
+        user.availability?.status === 'available'
+      );
+    },
+
+    // Get partially available developers
+    partiallyAvailableDevelopers: (state) => {
+      return state.users.filter(user => 
+        (user.role === 'Developer' || user.role === 'Lead Developer') &&
+        user.availability?.status === 'partially_available'
+      );
+    },
+
     // Get users by department
     getUsersByDepartment: (state) => (department) => {
       return state.users.filter(user => user.department === department);
@@ -54,6 +70,12 @@ export const useUsersStore = defineStore('users', {
     getUserEmail: (state) => (id) => {
       const user = state.users.find(user => user.id === id);
       return user ? user.email : '';
+    },
+
+    // Get user availability by ID
+    getUserAvailability: (state) => (id) => {
+      const user = state.users.find(user => user.id === id);
+      return user?.availability || { status: 'available' };
     },
 
     getNonDevelopers: (state) => {
@@ -127,7 +149,8 @@ export const useUsersStore = defineStore('users', {
         
       return {
         value: user.id,
-        label: label
+        label: label,
+        availability: user.availability
       };
     },
     
@@ -139,6 +162,45 @@ export const useUsersStore = defineStore('users', {
     // Get developers formatted for select dropdowns
     getDevelopersForSelect() {
       return this.developers.map(user => this.formatUserForSelect(user));
+    },
+    
+    // Update user availability status
+    async updateUserAvailability(userId, availabilityData) {
+      const notifications = useNotificationsStore();
+      
+      try {
+        const response = await fetch(`/api/users/${userId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            availability: availabilityData 
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to update availability: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Update user in the store
+        const index = this.users.findIndex(u => u.id === userId);
+        if (index !== -1) {
+          this.users[index] = {
+            ...this.users[index],
+            availability: availabilityData
+          };
+        }
+        
+        notifications.success('User availability updated successfully');
+        return data;
+      } catch (error) {
+        console.error('Error updating user availability:', error);
+        notifications.error('Failed to update user availability');
+        throw error;
+      }
     }
   }
 });

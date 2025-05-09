@@ -26,6 +26,10 @@ const props = defineProps({
   filterRole: {
     type: String,
     default: ''
+  },
+  showAvailability: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -202,6 +206,42 @@ const hasUsers = computed(() => {
 
 // Loading state
 const isLoading = computed(() => usersStore.loading);
+
+// Get the color class for user availability status badges
+const getAvailabilityColorClass = (status) => {
+  switch (status) {
+    case 'available': return 'bg-success-100 text-success-800';
+    case 'partially_available': return 'bg-warning-100 text-warning-800';
+    case 'unavailable': return 'bg-error-100 text-error-800';
+    default: return 'bg-neutral-100 text-neutral-600';
+  }
+};
+
+// Get the icon for user availability status
+const getAvailabilityIcon = (status) => {
+  switch (status) {
+    case 'available': return 'mdi-check-circle';
+    case 'partially_available': return 'mdi-clock-outline';
+    case 'unavailable': return 'mdi-close-circle';
+    default: return 'mdi-help-circle';
+  }
+};
+
+// Get the label for user availability status
+const getAvailabilityLabel = (status) => {
+  switch (status) {
+    case 'available': return 'Available';
+    case 'partially_available': return 'Partially Available';
+    case 'unavailable': return 'Unavailable';
+    default: return 'Unknown';
+  }
+};
+
+// Format workload for display
+const formatWorkload = (workload) => {
+  if (workload === undefined || workload === null) return '';
+  return `${workload}% workload`;
+};
 </script>
 
 <template>
@@ -283,7 +323,7 @@ const isLoading = computed(() => usersStore.loading);
           No users match your search
         </div>
         
-        <!-- User list with improved visibility -->
+        <!-- User list with improved visibility and availability status -->
         <div v-else class="py-1">
           <button
             v-for="user in filteredUsers" 
@@ -298,7 +338,39 @@ const isLoading = computed(() => usersStore.loading);
               </div>
               <div class="overflow-hidden">
                 <p class="font-medium text-neutral-800 truncate">{{ user.name }}</p>
-                <p class="text-xs text-neutral-500 truncate">{{ user.role }}</p>
+                <div class="flex items-center">
+                  <p class="text-xs text-neutral-500 truncate">{{ user.role }}</p>
+                  
+                  <!-- Availability badge - only shown if showAvailability prop is true -->
+                  <span
+                    v-if="showAvailability && user.availability"
+                    :class="[
+                      'ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs',
+                      getAvailabilityColorClass(user.availability.status)
+                    ]"
+                  >
+                    <span class="mdi mr-1" :class="getAvailabilityIcon(user.availability.status)"></span>
+                    {{ getAvailabilityLabel(user.availability.status) }}
+                  </span>
+                </div>
+                
+                <!-- Workload indicator if available -->
+                <div v-if="showAvailability && user.availability && user.availability.workload !== undefined" class="mt-1">
+                  <div class="w-full h-1.5 bg-neutral-200 rounded-full overflow-hidden">
+                    <div 
+                      class="h-full rounded-full" 
+                      :class="{
+                        'bg-success-500': user.availability.workload < 60,
+                        'bg-warning-500': user.availability.workload >= 60 && user.availability.workload < 85,
+                        'bg-error-500': user.availability.workload >= 85
+                      }"
+                      :style="{ width: `${user.availability.workload}%` }"
+                    ></div>
+                  </div>
+                  <p class="text-xs text-neutral-500 mt-0.5">
+                    {{ formatWorkload(user.availability.workload) }}
+                  </p>
+                </div>
               </div>
             </div>
             <span 

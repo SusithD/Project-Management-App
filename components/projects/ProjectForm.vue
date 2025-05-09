@@ -609,17 +609,18 @@ const availableRoles = computed(() => {
         ]"
         style="position: relative; z-index: 10;"
       >
-        <!-- Project Lead (Assigned To) - Modified to not filter by role -->
+        <!-- Project Lead (Assigned To) - Modified to show availability -->
         <div class="transition-all duration-200 hover:bg-neutral-50 p-4 rounded-md">
           <label class="block text-sm font-medium text-neutral-700">Project Lead</label>
           <div class="relative mt-3" style="z-index: 30;">
-            <!-- Removed the filterRole prop or set to more general filter -->
+            <!-- Added showAvailability prop -->
             <UserSelect
               v-model="formData.assignedTo"
               :required="true"
               label=""
               placeholder="Select project lead"
               :filterRole="''"
+              :showAvailability="true"
             />
             <span v-if="invalidFields.includes('assignedTo') && formSubmitAttempted" class="text-xs text-red-500 mt-2 block">
               Project lead is required
@@ -630,7 +631,7 @@ const availableRoles = computed(() => {
             </div>
           </div>
         </div>
-        <!-- Team Members Selection - With higher z-index -->
+        <!-- Team Members Selection - With higher z-index and availability -->
         <div class="mt-6 bg-neutral-50 p-5 rounded-lg">
           <label class="block text-sm font-medium text-neutral-700 mb-4 flex items-center gap-2">
             <span class="mdi mdi-account-multiple text-primary-600"></span>
@@ -642,6 +643,7 @@ const availableRoles = computed(() => {
               multiple
               label=""
               placeholder="Select team members"
+              :showAvailability="true"
             />
           </div>
         </div>
@@ -878,7 +880,7 @@ const availableRoles = computed(() => {
               :filterRole="null"
             />
           </div>
-          <!-- Developers - Using UserSelect component for multiple selection -->
+          <!-- Developers - Using UserSelect component for multiple selection with availability -->
           <div class="mt-6">
             <label class="block text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
               <span class="mdi mdi-laptop text-primary-600"></span>
@@ -888,7 +890,8 @@ const availableRoles = computed(() => {
               v-model="formData.developers"
               multiple
               placeholder="Select developers"
-              :filterRole="null"
+              :filterRole="'Developer'"
+              :showAvailability="true"
             />
           </div>
         </div>
