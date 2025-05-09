@@ -1,40 +1,36 @@
-version: '3.8'
+version: '3'
 
 services:
+  # Application service
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
-      - AZURE_AD_CLIENT_ID=${AZURE_AD_CLIENT_ID}
-      - AZURE_AD_TENANT_ID=${AZURE_AD_TENANT_ID}
-      - AZURE_AD_REDIRECT_URI=${AZURE_AD_REDIRECT_URI}
-      - AZURE_AD_CLIENT_SECRET=${AZURE_AD_CLIENT_SECRET}
-      - MONGODB_URI=mongodb://mongodb:27017/project_management
+      - MONGO_URI=mongodb://mongodb:27017/project_management
+      - NODE_ENV=development
     volumes:
-      - ./uploads:/app/uploads
-    restart: unless-stopped
+      - ./:/app
+      - /app/node_modules
     depends_on:
       - mongodb
-    networks:
-      - app-network
 
+  # MongoDB service
   mongodb:
-    image: mongo:latest
+    image: mongo:6
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
-    environment:
-      - MONGO_INITDB_DATABASE=project_management
-    restart: unless-stopped
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
+    # Health check to ensure MongoDB is running before starting the app
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
 volumes:
   mongodb_data:

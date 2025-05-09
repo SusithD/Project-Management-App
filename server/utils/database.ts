@@ -1,4 +1,4 @@
-import { MongoClient, Db } from 'mongodb'
+import { MongoClient, Db, ServerApiVersion } from 'mongodb'
 import { COLLECTIONS, projectValidationSchema, userValidationSchema } from '~/server/utils/schemas'
 import { useRuntimeConfig } from '#imports'
 
@@ -16,13 +16,24 @@ const MONGO_URI = config.mongodb?.uri || process.env.MONGODB_URI || process.env.
 const LOCAL_MONGO_URI = 'mongodb://localhost:27017'
 const MONGO_DB = config.mongodb?.dbName || process.env.MONGO_DB || 'project_management'
 
-// Connection options
+// Connection options with better defaults for reliability
 const CONNECTION_OPTIONS = {
   retryWrites: true,
-  connectTimeoutMS: 30000,
-  socketTimeoutMS: 45000,
+  connectTimeoutMS: 5000, // Lower timeout to fail faster
+  socketTimeoutMS: 30000,
   maxPoolSize: 50,
-  waitQueueTimeoutMS: 10000
+  waitQueueTimeoutMS: 10000,
+  serverApi: ServerApiVersion.v1,
+  directConnection: false,
+  retryReads: true,
+  serverSelectionTimeoutMS: 5000, // Lower timeout for faster fallback
+}
+
+// More reliable local connection options
+const LOCAL_CONNECTION_OPTIONS = {
+  ...CONNECTION_OPTIONS,
+  directConnection: true, // Better for local connections
+  serverSelectionTimeoutMS: 2000,
 }
 
 /**
@@ -34,35 +45,80 @@ export async function connectToDatabase() {
     return { db, client }
   }
 
+  let connectionError = null;
+
+  // Try connecting to MongoDB Atlas
   try {
     console.log(`Attempting to connect to MongoDB at ${MONGO_URI}...`)
     
     client = new MongoClient(MONGO_URI, CONNECTION_OPTIONS)
     await client.connect()
-    db = client.db(MONGO_DB)
     
+    // Test the connection with a ping
+    await client.db("admin").command({ ping: 1 });
+    console.log("Ping successful, connection is working");
+    
+    db = client.db(MONGO_DB)
     await setupCollections(db)
     
     console.log(`Connected to MongoDB database: ${MONGO_DB}`)
     return { db, client }
-  } catch (error) {
-    console.error('Failed to connect to MongoDB:', error)
+  } catch (error: any) {
+    console.error('Failed to connect to MongoDB:', error.message || error)
+    connectionError = error;
     
-    // Try connecting to local MongoDB if Atlas connection fails
-    try {
-      console.log(`Attempting to connect to local MongoDB at ${LOCAL_MONGO_URI}...`)
-      client = new MongoClient(LOCAL_MONGO_URI, CONNECTION_OPTIONS)
-      await client.connect()
-      db = client.db(MONGO_DB)
-      
-      await setupCollections(db)
-      
-      console.log(`Connected to local MongoDB database: ${MONGO_DB}`)
-      return { db, client }
-    } catch (localError) {
-      console.error('Failed to connect to local MongoDB:', localError)
-      throw error // Throw the original error
+    // Close the failed connection before trying a new one
+    if (client) {
+      try {
+        await client.close();
+      } catch (closeError) {
+        console.warn("Error closing failed connection:", closeError);
+      }
+      client = null;
     }
+  }
+    
+  // Try connecting to local MongoDB if Atlas connection fails
+  try {
+    console.log(`Attempting to connect to local MongoDB at ${LOCAL_MONGO_URI}...`)
+    client = new MongoClient(LOCAL_MONGO_URI, LOCAL_CONNECTION_OPTIONS)
+    await client.connect()
+    
+    // Test the connection with a ping
+    await client.db("admin").command({ ping: 1 });
+    console.log("Local MongoDB ping successful, connection is working");
+    
+    db = client.db(MONGO_DB)
+    await setupCollections(db)
+    
+    console.log(`Connected to local MongoDB database: ${MONGO_DB}`)
+    return { db, client }
+  } catch (localError: any) {
+    console.error('Failed to connect to local MongoDB:', localError.message || localError)
+    
+    // Close the failed local connection
+    if (client) {
+      try {
+        await client.close();
+      } catch (closeError) {
+        console.warn("Error closing failed local connection:", closeError);
+      }
+      client = null;
+    }
+    
+    // Provide a more helpful error message
+    const errorMessage = `
+MongoDB Connection Error: Unable to connect to either MongoDB Atlas or local MongoDB.
+
+Please check the following:
+1. Is your MongoDB Atlas connection string correct? Current: ${MONGO_URI}
+2. Is MongoDB running locally? Check with: brew services list (macOS) or service mongod status (Linux)
+3. Do you have network connectivity to MongoDB Atlas?
+4. Are your MongoDB Atlas credentials valid?
+
+Original error: ${connectionError?.message || connectionError || 'Unknown error'}
+`;
+    throw new Error(errorMessage);
   }
 }
 
