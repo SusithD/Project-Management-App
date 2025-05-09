@@ -45,7 +45,11 @@ export default defineEventHandler(async (event) => {
       message: body.content || body.message,
       date: body.date || new Date().toISOString().split('T')[0],
       user: body.author || body.user || 'Anonymous',
-      createdAt: new Date()
+      createdAt: new Date(),
+      // Add support for update type (daily or regular)
+      type: body.type || 'regular',
+      // Add support for user ID for tracking updates
+      userId: body.userId || null
     }
     
     // Connect to database

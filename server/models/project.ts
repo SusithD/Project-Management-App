@@ -39,6 +39,8 @@ export interface ProjectUpdate {
   content: string;
   date: string;
   author: string;
+  type?: 'regular' | 'daily';  // Type of update - daily is for team member daily updates
+  userId?: string;             // Store user ID to track who made updates
 }
 
 export interface ProjectFile {

@@ -28,6 +28,9 @@ const mongoObjectId = ref(null);
 // New update form state
 const newUpdate = ref('');
 const isSubmittingUpdate = ref(false);
+const updateType = ref('regular'); // Options: 'regular', 'daily'
+const missingUpdates = ref([]);
+const lastUpdateByUser = ref({});
 
 // File upload state
 const fileInput = ref(null);
@@ -130,7 +133,9 @@ const addUpdate = async () => {
       id: updateId, // Add an ID field to satisfy the schema validation
       content: newUpdate.value,
       date: new Date().toISOString().split('T')[0],
-      author: authStore.userFullName
+      author: authStore.userFullName,
+      type: updateType.value, // Add type field to track daily updates
+      userId: authStore.userId || authStore.user?.id // Save the user ID for tracking
     };
     
     // Use MongoDB ObjectId for API calls
@@ -166,16 +171,31 @@ const addUpdate = async () => {
       id: data.update.id,
       content: data.update.message,
       date: data.update.date,
-      author: data.update.user
+      author: data.update.user,
+      type: data.update.type || 'regular',
+      userId: data.update.userId
     };
     
     project.value.updates.unshift(uiUpdate);
     
+    // Update last update tracking for this user
+    if (authStore.userId) {
+      lastUpdateByUser.value[authStore.userId] = new Date().toISOString().split('T')[0];
+    }
+    
+    // Refresh missing updates list
+    checkMissingDailyUpdates();
+    
     // Clear input
     newUpdate.value = '';
+    updateType.value = 'regular';
     
     // Show success notification
-    notificationsStore.success('Update added successfully');
+    if (update.type === 'daily') {
+      notificationsStore.success('Daily update added successfully');
+    } else {
+      notificationsStore.success('Update added successfully');
+    }
   } catch (err) {
     console.error('Error adding update:', err);
     notificationsStore.error('Failed to add update. Please try again.');
@@ -184,144 +204,62 @@ const addUpdate = async () => {
   }
 };
 
-// Handle file selection
-const handleFileSelect = (event) => {
-  const files = event.target.files;
-  if (files.length > 0) {
-    selectedFile.value = files[0];
-  }
-};
-
-// Upload file
-const uploadFile = async () => {
-  if (!selectedFile.value) return;
+// Check which team members haven't provided daily updates
+const checkMissingDailyUpdates = () => {
+  if (!project.value || !project.value.team) return;
   
-  uploadingFile.value = true;
-  uploadProgress.value = 0;
+  const today = new Date().toISOString().split('T')[0];
+  const teamMembers = [...(project.value.team || []), 
+                      ...(project.value.developers || [])];
   
-  try {
-    // Create form data for file upload
-    const formData = new FormData();
-    formData.append('file', selectedFile.value);
-    
-    // Use MongoDB ObjectId for API calls
-    const idToUse = mongoObjectId.value || project.value?._id;
-    
-    if (!idToUse) {
-      throw new Error("No valid MongoDB ID available");
-    }
-    
-    formData.append('projectId', idToUse);
-    formData.append('uploadedBy', authStore.userFullName);
-    
-    // Use fetch with XMLHttpRequest to track progress
-    const xhr = new XMLHttpRequest();
-    
-    xhr.upload.addEventListener('progress', (event) => {
-      if (event.lengthComputable) {
-        uploadProgress.value = Math.round((event.loaded / event.total) * 100);
-      }
-    });
-    
-    // Create a Promise to handle the XHR request
-    await new Promise((resolve, reject) => {
-      xhr.open('POST', `/api/projects/${idToUse}/files`);
-      xhr.setRequestHeader('Authorization', authStore.authHeader);
-      
-      xhr.onreadystatechange = () => {
-        if (xhr.readyState === 4) {
-          if (xhr.status === 200 || xhr.status === 201) {
-            resolve(JSON.parse(xhr.responseText));
-          } else {
-            reject(new Error(`Upload failed with status: ${xhr.status}`));
-          }
+  if (project.value.assignedTo) teamMembers.push(project.value.assignedTo);
+  if (project.value.responsiblePerson) teamMembers.push(project.value.responsiblePerson);
+  
+  // Remove duplicates
+  const uniqueTeamMembers = [...new Set(teamMembers)];
+  
+  // Initialize or update last update tracking
+  if (project.value.updates) {
+    project.value.updates.forEach(update => {
+      if (update.userId && update.type === 'daily') {
+        const updateDate = update.date;
+        if (!lastUpdateByUser.value[update.userId] || updateDate > lastUpdateByUser.value[update.userId]) {
+          lastUpdateByUser.value[update.userId] = updateDate;
         }
-      };
-      
-      xhr.onerror = () => reject(new Error('Network error during upload'));
-      xhr.send(formData);
-    });
-    
-    // Add file to project files list with response data (would come from API in real implementation)
-    if (!project.value.files) {
-      project.value.files = [];
-    }
-    
-    // Add the file to our list
-    project.value.files.unshift({
-      name: selectedFile.value.name,
-      size: formatFileSize(selectedFile.value.size),
-      uploadedOn: new Date().toISOString().split('T')[0],
-      uploadedBy: authStore.userFullName
-    });
-    
-    // Reset file input
-    if (fileInput.value) {
-      fileInput.value.value = '';
-    }
-    selectedFile.value = null;
-    
-    // Show success notification
-    notificationsStore.success('File uploaded successfully!');
-  } catch (err) {
-    console.error('Error uploading file:', err);
-    notificationsStore.error('Failed to upload file. Please try again.');
-  } finally {
-    uploadingFile.value = false;
-    uploadProgress.value = 0;
-  }
-};
-
-// Format file size
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes';
-  
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
-// Handle file download
-const downloadFile = async (file) => {
-  try {
-    // Use MongoDB ObjectId for API calls
-    const idToUse = mongoObjectId.value || project.value?._id;
-    
-    if (!idToUse) {
-      throw new Error("No valid MongoDB ID available");
-    }
-    
-    // In a real app, we'd call the API to download the file
-    const response = await fetch(`/api/projects/${idToUse}/files/${encodeURIComponent(file.name)}`, {
-      headers: {
-        'Authorization': authStore.authHeader
       }
     });
-    
-    if (!response.ok) {
-      throw new Error(`Download failed: ${response.statusText}`);
-    }
-    
-    // Create blob from response and download
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    a.remove();
-    
-    // Show info notification
-    notificationsStore.info(`Downloading ${file.name}`);
-  } catch (err) {
-    console.error('Error downloading file:', err);
-    notificationsStore.error(`Error downloading ${file.name}. Please try again.`);
   }
+  
+  // Check which team members need to add updates today
+  missingUpdates.value = uniqueTeamMembers.filter(userId => {
+    const lastUpdate = lastUpdateByUser.value[userId];
+    return !lastUpdate || lastUpdate < today;
+  });
+};
+
+// Check if current user needs to provide a daily update
+const needsDailyUpdate = computed(() => {
+  if (!authStore.userId) return false;
+  return missingUpdates.value.includes(authStore.userId);
+});
+
+// Format how long ago an update was made
+const formatTimeAgo = (dateStr) => {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffTime = Math.abs(now - date);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} week(s) ago`;
+  return `${Math.floor(diffDays / 30)} month(s) ago`;
+};
+
+// Function to get the last update date for a user
+const getLastUpdateDate = (userId) => {
+  return lastUpdateByUser.value[userId] || null;
 };
 
 // Delete a file
@@ -499,7 +437,10 @@ onMounted(async () => {
   }
   
   // Then fetch the project
-  fetchProject();
+  await fetchProject();
+  
+  // Initialize missing updates check
+  checkMissingDailyUpdates();
 });
 
 // Function to check if a URL is valid
@@ -1851,9 +1792,7 @@ const hasExternalLinks = computed(() => {
                   </div>
                   <div class="flex justify-between mt-2">
                     <div class="text-xs font-medium">{{ project.startDate }}</div>
-                    <div :class="['text-xs font-medium', isOverdue ? 'text-error-600' : '']">
-                      {{ project.endDate }}
-                    </div>
+                    <div class="text-xs font-medium">{{ project.endDate }}</div>
                   </div>
                 </div>
               </div>
@@ -1901,20 +1840,126 @@ const hasExternalLinks = computed(() => {
       <div v-if="activeTab === 'updates'" class="bg-white rounded-lg shadow-card p-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-medium text-neutral-900">Project Updates</h2>
+          <div class="flex items-center">
+            <span v-if="missingUpdates.length > 0" class="bg-warning-100 text-warning-800 text-xs px-3 py-1 rounded-full flex items-center mr-3">
+              <span class="mdi mdi-alert-circle-outline mr-1"></span>
+              {{ missingUpdates.length }} {{ missingUpdates.length === 1 ? 'member' : 'members' }} missing updates
+            </span>
+          </div>
+        </div>
+        
+        <!-- Daily Update Required Alert -->
+        <div v-if="needsDailyUpdate" class="mb-6 bg-warning-50 border-l-4 border-warning-500 p-4 rounded-md">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <span class="mdi mdi-calendar-alert text-xl text-warning-500"></span>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-warning-800">Daily Update Required</h3>
+              <div class="mt-2 text-sm text-warning-700">
+                <p>You need to provide your daily update for this project. Team members must submit daily updates on their progress.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Team Members Update Status -->
+        <div class="mb-6 bg-neutral-50 p-4 rounded-md">
+          <h3 class="text-md font-medium text-neutral-800 mb-3 flex items-center">
+            <span class="mdi mdi-account-clock text-primary-600 mr-2"></span>
+            Team Update Status
+          </h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <!-- Team members who need updates -->
+            <div v-for="memberId in missingUpdates" :key="`missing-${memberId}`"
+              class="flex items-center p-3 bg-white border border-warning-200 rounded-lg text-sm">
+              <div class="w-8 h-8 rounded-full bg-warning-100 text-warning-600 flex items-center justify-center mr-2">
+                <span class="mdi mdi-account-alert"></span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium truncate">{{ getUserName(memberId) }}</div>
+                <div class="text-xs text-neutral-500">Update needed</div>
+              </div>
+              <span class="mdi mdi-clock-alert-outline text-warning-500 ml-2"></span>
+            </div>
+            
+            <!-- Team members who have updated -->
+            <div v-for="[memberId, date] in Object.entries(lastUpdateByUser)" :key="`updated-${memberId}`"
+              class="flex items-center p-3 bg-white border border-success-200 rounded-lg text-sm"
+              v-if="!missingUpdates.includes(memberId) && date">
+              <div class="w-8 h-8 rounded-full bg-success-100 text-success-600 flex items-center justify-center mr-2">
+                <span class="mdi mdi-account-check"></span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium truncate">{{ getUserName(memberId) }}</div>
+                <div class="text-xs text-neutral-500">Last update: {{ formatTimeAgo(date) }}</div>
+              </div>
+              <span class="mdi mdi-check-circle text-success-500 ml-2"></span>
+            </div>
+          </div>
         </div>
         
         <!-- Add Update Form -->
         <div v-if="canEdit" class="mb-6 bg-neutral-50 p-4 rounded-md">
-          <h3 class="text-md font-medium text-neutral-800 mb-2">Add New Update</h3>
+          <h3 class="text-md font-medium text-neutral-800 mb-2 flex items-center">
+            <span class="mdi mdi-message-plus-outline text-primary-600 mr-2"></span>
+            Add New Update
+          </h3>
+          
+          <!-- Update Type Toggle -->
+          <div class="flex items-center mb-4">
+            <span class="text-sm text-neutral-600 mr-3">Update Type:</span>
+            <div class="flex items-center space-x-4">
+              <label class="inline-flex items-center cursor-pointer">
+                <input 
+                  type="radio" 
+                  class="form-radio h-4 w-4 text-primary-600 transition duration-150 ease-in-out" 
+                  name="update-type" 
+                  :value="'regular'" 
+                  v-model="updateType"
+                />
+                <span class="ml-2 text-sm text-neutral-700">Regular Update</span>
+              </label>
+              
+              <label class="inline-flex items-center cursor-pointer">
+                <input 
+                  type="radio" 
+                  class="form-radio h-4 w-4 text-success-600 transition duration-150 ease-in-out" 
+                  name="update-type" 
+                  :value="'daily'" 
+                  v-model="updateType"
+                />
+                <span class="ml-2 text-sm text-neutral-700">
+                  Daily Update
+                  <span v-if="needsDailyUpdate" class="ml-1 bg-warning-100 text-warning-700 text-xs px-2 py-0.5 rounded-full">Required</span>
+                </span>
+              </label>
+            </div>
+          </div>
+          
           <div class="mb-3">
             <textarea 
               v-model="newUpdate" 
-              placeholder="Enter project update..." 
+              :placeholder="updateType === 'daily' ? 'Enter your daily progress update...' : 'Enter project update...'" 
               rows="3" 
               class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              :class="{ 'border-warning-300 ring-1 ring-warning-500': updateType === 'daily' && needsDailyUpdate }"
               :disabled="isSubmittingUpdate"
             ></textarea>
           </div>
+          
+          <!-- Suggestions for daily updates -->
+          <div v-if="updateType === 'daily'" class="mb-3 text-sm text-neutral-600">
+            <p class="font-medium mb-1">Suggested daily update format:</p>
+            <ul class="list-disc pl-5 space-y-1 text-xs">
+              <li>What you accomplished today</li>
+              <li>What you're planning to work on next</li>
+              <li>Any blockers or issues you're facing</li>
+              <li>Estimated completion percentage of your assigned tasks</li>
+            </ul>
+          </div>
+          
           <div class="flex justify-end">
             <button 
               @click="addUpdate" 
@@ -1923,23 +1968,35 @@ const hasExternalLinks = computed(() => {
                 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm',
                 (!newUpdate.trim() || isSubmittingUpdate)
                   ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
-                  : 'bg-primary-600 text-white hover:bg-primary-700'
+                  : updateType === 'daily' 
+                    ? 'bg-success-600 text-white hover:bg-success-700' 
+                    : 'bg-primary-600 text-white hover:bg-primary-700'
               ]"
             >
               <span v-if="isSubmittingUpdate" class="mdi mdi-loading mdi-spin text-lg mr-2"></span>
+              <span v-else-if="updateType === 'daily'" class="mdi mdi-calendar-check text-lg mr-2"></span>
               <span v-else class="mdi mdi-plus text-lg mr-2"></span>
-              {{ isSubmittingUpdate ? 'Submitting...' : 'Add Update' }}
+              {{ isSubmittingUpdate ? 'Submitting...' : updateType === 'daily' ? 'Add Daily Update' : 'Add Update' }}
             </button>
           </div>
         </div>
         
         <!-- Updates List -->
         <div v-if="project.updates && project.updates.length > 0" class="space-y-4">
-          <div v-for="(update, index) in project.updates" :key="index" class="bg-neutral-50 p-4 rounded-md">
+          <div v-for="(update, index) in project.updates" :key="index" 
+              :class="[
+                'p-4 rounded-md',
+                update.type === 'daily' ? 'bg-success-50 border border-success-100' : 'bg-neutral-50'
+              ]">
             <div class="flex justify-between items-start mb-2">
-              <div>
+              <div class="flex items-center">
                 <span class="font-medium text-neutral-900">{{ update.author }}</span>
                 <span class="text-neutral-500 text-sm ml-2">{{ update.date }}</span>
+                <span v-if="update.type === 'daily'" 
+                  class="ml-2 bg-success-100 text-success-800 text-xs px-2 py-0.5 rounded-full flex items-center">
+                  <span class="mdi mdi-calendar-check text-xs mr-1"></span>
+                  Daily Update
+                </span>
               </div>
             </div>
             <p class="text-neutral-700">{{ update.content }}</p>
@@ -1950,7 +2007,9 @@ const hasExternalLinks = computed(() => {
         <div v-else class="text-center py-8 text-neutral-500">
           <span class="mdi mdi-message-text-outline text-4xl block mb-2"></span>
           <p class="text-lg font-medium">No updates yet</p>
-          <p v-if="canEdit" class="text-sm mt-1">Add an update to keep the team informed about the project's progress.</p>
+          <p v-if="canEdit" class="text-sm mt-1">
+            Team members should add daily updates to keep everyone informed about the project's progress.
+          </p>
         </div>
       </div>
       
@@ -2112,7 +2171,7 @@ const hasExternalLinks = computed(() => {
             <!-- Project Lead Card -->
             <div class="bg-white rounded-xl shadow-sm border border-neutral-100 p-5 transition-all duration-300 hover:shadow-md">
               <div class="flex items-center">
-                <div class="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                <div class="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center mr-3">
                   <span class="mdi mdi-account-tie text-2xl text-primary-600"></span>
                 </div>
                 <div class="ml-4">
@@ -2131,7 +2190,7 @@ const hasExternalLinks = computed(() => {
             <!-- Responsible Person Card -->
             <div class="bg-white rounded-xl shadow-sm border border-neutral-100 p-5 transition-all duration-300 hover:shadow-md">
               <div class="flex items-center">
-                <div class="h-16 w-16 rounded-full bg-accent-100 flex items-center justify-center flex-shrink-0">
+                <div class="h-16 w-16 rounded-full bg-accent-100 flex items-center justify-center mr-3">
                   <span class="mdi mdi-account-star text-2xl text-accent-600"></span>
                 </div>
                 <div class="ml-4">
@@ -2181,7 +2240,7 @@ const hasExternalLinks = computed(() => {
                 </div>
                 <div v-if="canEdit && isEditing" 
                   class="ml-2 p-1 rounded-full hover:bg-neutral-100 cursor-pointer" 
-                  title="Remove member"
+                  title="Remove from team"
                 >
                   <span class="mdi mdi-close text-neutral-500 hover:text-error-600"></span>
                 </div>
