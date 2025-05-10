@@ -17,5 +17,24 @@
 </template>
 
 <script setup>
+import { ref, provide } from 'vue';
+import { useAuthStore } from '~/stores/auth';
+import AppSidebar from '~/components/app/Sidebar.vue';
+import AppHeader from '~/components/app/Header.vue';
 import AppNotifications from '~/components/app/Notifications.vue';
+
+// Get the authentication store
+const authStore = useAuthStore();
+
+// Create a user ref for components that need it
+const user = ref(authStore.user);
+
+// Provide user data to child components
+provide('user', user);
+
+// Provide logout function to child components
+provide('logout', () => {
+  authStore.clearUser();
+  navigateTo('/login');
+});
 </script>

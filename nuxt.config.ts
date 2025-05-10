@@ -85,7 +85,8 @@ export default defineNuxtConfig({
     '/projects/**': { ssr: false },
     '/users/**': { ssr: false },
     '/tasks/**': { ssr: false },
-    '/settings/**': { ssr: false }
+    '/settings/**': { ssr: false },
+    '/reports/**': { ssr: false }
   },
 
   // Adding an alias for the dashboard
