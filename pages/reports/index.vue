@@ -112,19 +112,12 @@
           </div>
         </div>
         
-        <div class="relative">
-          <select 
-            v-model="filters.teamMember" 
-            class="pl-10 pr-4 py-2 border border-neutral-300 rounded-md bg-white focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm min-w-[180px]"
-          >
-            <option value="all">All Team Members</option>
-            <option v-for="user in users" :key="user._id" :value="user._id">
-              {{ user.name }}
-            </option>
-          </select>
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <span class="mdi mdi-account-group text-neutral-500"></span>
-          </div>
+        <div class="w-64">
+          <UserSelect
+            v-model="filters.teamMember"
+            placeholder="All Team Members"
+            label="Team Member"
+          />
         </div>
         
         <button 
@@ -767,6 +760,7 @@ import { useUsersStore } from '~/stores/users';
 import { useProjectsStore } from '~/stores/projects';
 import { useNotificationsStore } from '~/stores/notifications';
 import { Chart, registerables } from 'chart.js';
+import UserSelect from '~/components/common/UserSelect.vue';
 
 // Register Chart.js components
 Chart.register(...registerables);
