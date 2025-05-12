@@ -3,6 +3,7 @@ import { ObjectId, Int32 } from 'mongodb'
 import { useRuntimeConfig } from '#imports'
 import { connectToDatabase } from '~/server/utils/database'
 import { COLLECTIONS } from '~/server/utils/schemas'
+import { sendProjectAssignmentNotification } from '~/server/utils/email'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -30,6 +31,26 @@ export default defineEventHandler(async (event) => {
     // Connect to database
     const { db } = await connectToDatabase()
     const collection = db.collection(COLLECTIONS.PROJECTS)
+    
+    // Get original project to check for changes in assignment
+    let query;
+    try {
+      // Try to convert to ObjectId
+      query = { _id: new ObjectId(id) };
+    } catch (err) {
+      // If not a valid ObjectId, search by numeric id
+      query = { id: parseInt(id) };
+    }
+    
+    // Get the original project before making changes
+    const originalProject = await collection.findOne(query);
+    
+    if (!originalProject) {
+      throw createError({
+        statusCode: 404,
+        message: 'Project not found'
+      });
+    }
     
     // Prepare update data - exclude _id field
     const { _id, ...updateData } = body;
@@ -68,16 +89,6 @@ export default defineEventHandler(async (event) => {
       updateData.team = [];
     }
     
-    // Search by numeric ID or MongoDB ObjectId
-    let query;
-    try {
-      // Try to convert to ObjectId
-      query = { _id: new ObjectId(id) };
-    } catch (err) {
-      // If not a valid ObjectId, search by numeric id
-      query = { id: parseInt(id) };
-    }
-    
     // Update project in database
     const result = await collection.updateOne(
       query,
@@ -94,6 +105,43 @@ export default defineEventHandler(async (event) => {
     
     // Fetch the updated project
     const updatedProject = await collection.findOne(query);
+    
+    // Check if the assignment has changed and send email notification
+    if (updatedProject && 
+        updateData.assignedTo && 
+        (!originalProject.assignedTo || 
+         originalProject.assignedTo.toString() !== updateData.assignedTo.toString())) {
+      try {
+        // Get user info from database
+        const usersCollection = db.collection(COLLECTIONS.USERS);
+        const assignedUser = await usersCollection.findOne({ _id: updateData.assignedTo });
+        
+        if (assignedUser && assignedUser.email) {
+          // Get info about who made the update
+          let updaterName = 'System Administrator';
+          if (body.userEmail) {
+            const updater = await usersCollection.findOne({ email: body.userEmail });
+            if (updater && updater.name) {
+              updaterName = updater.name;
+            }
+          }
+          
+          // Send notification to the newly assigned user
+          await sendProjectAssignmentNotification(
+            assignedUser.email,
+            assignedUser.name || 'Team Member',
+            updatedProject.name,
+            updatedProject._id.toString(),
+            updaterName
+          );
+          
+          console.log(`Project assignment notification sent to ${assignedUser.email}`);
+        }
+      } catch (emailError) {
+        // Log the error but don't fail the project update
+        console.error('Error sending project assignment email:', emailError);
+      }
+    }
     
     return updatedProject;
   } catch (error) {

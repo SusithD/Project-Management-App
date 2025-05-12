@@ -20,6 +20,14 @@ export default defineNuxtConfig({
       clientSecret: process.env.AZURE_AD_CLIENT_SECRET,
       redirectUri: process.env.AZURE_AD_REDIRECT_URI
     },
+    // Email configuration
+    email: {
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port: process.env.EMAIL_PORT || '587',
+      user: process.env.EMAIL_USER || '',
+      password: process.env.EMAIL_PASS || '',
+      from: process.env.EMAIL_FROM || 'noreply@projectmanagement.com'
+    },
     // MongoDB configuration
     mongodb: {
       uri: process.env.MONGO_URI || 'mongodb://localhost:27017',
@@ -27,6 +35,7 @@ export default defineNuxtConfig({
     },
     // Public environment variables
     public: {
+      appUrl: process.env.APP_URL || 'http://localhost:3000',
       msalConfig: {
         auth: {
           clientId: process.env.AZURE_AD_CLIENT_ID || 'your-client-id',
