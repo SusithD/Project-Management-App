@@ -1,12 +1,12 @@
 import nodemailer from 'nodemailer';
 import { sendProjectAssignmentNotification, sendEmail } from './email';
 
-// Email configuration with values from .env
-const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
-const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
-const EMAIL_USER = process.env.EMAIL_USER || 'iamsusithalwis@gmail.com';
-const EMAIL_PASS = process.env.EMAIL_PASS || 'xnglzxfzwnljlthf';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'iamsusithalwis@gmail.com';
+// Email configuration from environment variables
+const EMAIL_HOST = process.env.EMAIL_HOST;
+const EMAIL_PORT = process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT) : undefined;
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASS = process.env.EMAIL_PASS;
+const EMAIL_FROM = process.env.EMAIL_FROM;
 
 async function testDirectEmailSending() {
   console.log('📧 Testing direct email sending...');
@@ -25,8 +25,8 @@ async function testDirectEmailSending() {
       port: EMAIL_PORT,
       secure: EMAIL_PORT === 465,
       auth: {
-        user: EMAIL_USER,
-        pass: EMAIL_PASS,
+        user: EMAIL_USER || (() => { throw new Error('EMAIL_USER is not defined'); })(),
+        pass: EMAIL_PASS || (() => { throw new Error('EMAIL_PASS is not defined'); })(),
       },
           });
     
@@ -65,7 +65,7 @@ async function testProjectNotification() {
   
   try {
     const result = await sendProjectAssignmentNotification(
-      EMAIL_USER, // Your email
+      EMAIL_USER || (() => { throw new Error('EMAIL_USER is not defined'); })(), // Your email
       'Test User',
       'Debug Test Project',
       '123456789',
