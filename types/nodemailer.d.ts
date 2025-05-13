@@ -7,6 +7,14 @@ declare module 'nodemailer' {
       user: string;
       pass: string;
     };
+    // Add missing properties used in our code
+    connectionTimeout?: number;
+    socketTimeout?: number;
+    tls?: {
+      rejectUnauthorized?: boolean;
+      [key: string]: any;
+    };
+    debug?: boolean;
   }
 
   export interface SendMailOptions {
@@ -24,6 +32,8 @@ declare module 'nodemailer' {
 
   export interface Transporter {
     sendMail(options: SendMailOptions): Promise<SentMessageInfo>;
+    // Add the verify method used in our code
+    verify(): Promise<boolean>;
   }
 
   function createTransport(options: TransportOptions): Transporter;

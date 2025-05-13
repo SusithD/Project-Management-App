@@ -18,6 +18,11 @@ const EMAIL_PASS = config.email?.password || process.env.EMAIL_PASS || '';
 const EMAIL_FROM = config.email?.from || process.env.EMAIL_FROM || 'noreply@projectmanagement.com';
 const APP_NAME = 'CoverageX Project Management';
 
+// Maximum number of retry attempts for sending emails
+const MAX_RETRY_ATTEMPTS = 3;
+// Delay between retry attempts (in milliseconds)
+const RETRY_DELAY = 1000;
+
 console.log('📧 [Email Service] Initializing with config:',  { 
   host: EMAIL_HOST, 
   port: EMAIL_PORT, 
@@ -26,38 +31,62 @@ console.log('📧 [Email Service] Initializing with config:',  {
   from: EMAIL_FROM 
 });
 
-// Create reusable transporter object using SMTP transport
-const transporter = nodemailer.createTransport({
-  host: EMAIL_HOST,
-  port: EMAIL_PORT,
-  secure: EMAIL_PORT === 465, // true for 465, false for other ports
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASS,
-  },
-  // Logger is not a valid TransportOptions property; consider using a custom logging mechanism if needed
-});
+// Create a function to get a fresh transporter
+function createTransporter() {
+  return nodemailer.createTransport({
+    host: EMAIL_HOST,
+    port: EMAIL_PORT,
+    secure: EMAIL_PORT === 465, // true for 465, false for other ports
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASS,
+    },
+    // Connection timeout settings to prevent hanging issues
+    connectionTimeout: 30000, // 30 seconds connection timeout
+    socketTimeout: 60000,     // 60 seconds socket timeout
+    tls: {
+      rejectUnauthorized: false, // For self-signed certificates
+    },
+  });
+}
+
+// Initialize the transporter
+let transporter = createTransporter();
 
 // Verify transporter connection on initialization
 if (EMAIL_USER && EMAIL_PASS) {
-  (transporter as any).verify()
-    .then(() => console.log('📧 [Email Service] SMTP connection verified successfully'))
-    .catch((error: Error) => console.error('❌ [Email Service] SMTP connection verification failed:', error));
+  (async () => {
+    try {
+      // Use the proper method to verify connection
+      await transporter.verify();
+      console.log('📧 [Email Service] SMTP connection verified successfully');
+    } catch (error) {
+      console.error('❌ [Email Service] SMTP connection verification failed:', error);
+      console.log('📧 [Email Service] Will attempt to reconnect when sending emails');
+    }
+  })();
 } else {
   console.warn('⚠️ [Email Service] Email credentials not provided - email sending will not work');
 }
 
 /**
- * Send an email notification
+ * Send an email notification with retry capability
  * 
  * @param to Email address of the recipient
  * @param subject Email subject
  * @param html HTML content of the email
  * @param text Plain text version of the email
+ * @param retryAttempt Current retry attempt number
  * @returns Promise resolving to send result
  */
-export async function sendEmail(to: string, subject: string, html: string, text?: string) {
-  console.log(`📧 [Email Service] Sending email to: ${to}, subject: ${subject}`);
+export async function sendEmail(
+  to: string, 
+  subject: string, 
+  html: string, 
+  text?: string, 
+  retryAttempt: number = 0
+) {
+  console.log(`📧 [Email Service] Sending email to: ${to}, subject: ${subject}, attempt: ${retryAttempt + 1}`);
   
   if (!EMAIL_USER || !EMAIL_PASS) {
     console.error('❌ [Email Service] Cannot send email: Missing credentials');
@@ -65,6 +94,12 @@ export async function sendEmail(to: string, subject: string, html: string, text?
   }
   
   try {
+    // Get a fresh transporter if this is a retry
+    if (retryAttempt > 0) {
+      console.log(`📧 [Email Service] Creating fresh transporter for retry attempt ${retryAttempt + 1}`);
+      transporter = createTransporter();
+    }
+    
     const info = await transporter.sendMail({
       from: `"${APP_NAME}" <${EMAIL_FROM}>`,
       to,
@@ -76,8 +111,29 @@ export async function sendEmail(to: string, subject: string, html: string, text?
     console.log(`📧 [Email Service] Email sent successfully: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (error: any) {
-    console.error('❌ [Email Service] Email sending failed:', error.message || error);
-    return { success: false, error: error.message || 'Email sending failed' };
+    console.error(`❌ [Email Service] Email sending failed (attempt ${retryAttempt + 1}):`, error.message || error);
+    
+    // Check if we should retry
+    if (retryAttempt < MAX_RETRY_ATTEMPTS && 
+        (error.code === 'ECONNRESET' || 
+         error.code === 'ETIMEDOUT' || 
+         error.code === 'ESOCKET' ||
+         error.code === 'ECONNREFUSED')) {
+      
+      console.log(`📧 [Email Service] Connection error detected. Will retry in ${RETRY_DELAY}ms...`);
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      
+      // Attempt to retry
+      return sendEmail(to, subject, html, text, retryAttempt + 1);
+    }
+    
+    return { 
+      success: false, 
+      error: error.message || 'Email sending failed',
+      code: error.code
+    };
   }
 }
 
@@ -274,4 +330,272 @@ export async function sendProjectAssignmentNotification(
   `;
 
   return await sendEmail(userEmail, subject, html);
+}
+
+/**
+ * Send a notification when blockers are added or updated for a project
+ * 
+ * @param userEmail Email address of the responsible person
+ * @param userName Name of the responsible person
+ * @param projectName Name of the project
+ * @param projectId ID of the project (can be any string format)
+ * @param blockerDetails The details of the blocker
+ * @param updatedBy Name of the user who added/updated the blocker
+ */
+export async function sendBlockerNotification(
+  userEmail: string,
+  userName: string,
+  projectName: string,
+  projectId: string,
+  blockerDetails: string,
+  updatedBy: string
+) {
+  console.log(`📧 [Email Service] Sending blocker notification to ${userEmail} for project '${projectName}'`);
+  
+  // Ensure projectId is treated as a string without any conversion
+  const safeProjectId = String(projectId);
+  
+  const subject = `Blocker Update: ${projectName}`;
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="color-scheme" content="light dark">
+      <meta name="supported-color-schemes" content="light dark">
+      <title>Blocker Update: ${projectName}</title>
+      <style>
+        @media (prefers-color-scheme: dark) {
+          .email-body { background-color: #1a1a1a !important; }
+          .email-container { background-color: #2d2d2d !important; border-color: #444444 !important; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4) !important; }
+          .header { background: linear-gradient(135deg, #004080 0%, #0074cc 100%) !important; }
+          .body-content { background-color: #2d2d2d !important; color: #e1e1e1 !important; }
+          .greeting, .project-title { color: #ffffff !important; }
+          .text-content { color: #cccccc !important; }
+          .project-card { background: linear-gradient(to right, #252525, #2a2a2a) !important; border-color: #444444 !important; }
+          .data-label { color: #a0aec0 !important; }
+          .data-value { color: #e1e1e1 !important; }
+          .help-box { background-color: #252525 !important; border-color: #444444 !important; }
+          .footer { background: linear-gradient(to right, #252525, #2a2a2a) !important; border-color: #444444 !important; }
+          .footer-text { color: #a0aec0 !important; }
+        }
+
+        /* Fix for Outlook dark mode */
+        [data-ogsc] .email-body { background-color: #1a1a1a !important; }
+        [data-ogsc] .email-container { background-color: #2d2d2d !important; border-color: #444444 !important; }
+        [data-ogsc] .header { background: linear-gradient(135deg, #004080 0%, #0074cc 100%) !important; }
+        [data-ogsc] .body-content { background-color: #2d2d2d !important; color: #e1e1e1 !important; }
+        [data-ogsc] .greeting, [data-ogsc] .project-title { color: #ffffff !important; }
+        [data-ogsc] .text-content { color: #cccccc !important; }
+        [data-ogsc] .project-card { background: linear-gradient(to right, #252525, #2a2a2a) !important; border-color: #444444 !important; }
+        [data-ogsc] .data-label { color: #a0aec0 !important; }
+        [data-ogsc] .data-value { color: #e1e1e1 !important; }
+        [data-ogsc] .help-box { background-color: #252525 !important; border-color: #444444 !important; }
+        [data-ogsc] .footer { background: linear-gradient(to right, #252525, #2a2a2a) !important; border-color: #444444 !important; }
+        [data-ogsc] .footer-text { color: #a0aec0 !important; }
+      </style>
+    </head>
+    <body style="margin: 0; padding: 0; font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background-color: #f5f7fa; color: #333333;" class="email-body">
+      <div class="email-container" style="max-width: 650px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); margin-top: 20px; margin-bottom: 20px; border: 1px solid #e5e7eb;">
+        <!-- Header with Blue Theme -->
+        <div class="header" style="position: relative; background: linear-gradient(135deg, #0062cc 0%, #0096ff 100%); padding: 30px 25px; color: white; text-align: center;">
+          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYyMCIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1kYXNoYXJyYXk9IjMgMiIvPjwvc3ZnPg=='); opacity: 0.3;"></div>
+          <svg style="width: 50px; height: 50px; margin-bottom: 10px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          <h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${APP_NAME}</h1>
+          <p style="margin: 10px 0 0; font-size: 16px; opacity: 0.9;">Blocker Update Notification</p>
+          <div style="position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); background: #ffffff; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+            <svg style="width: 16px; height: 16px; color: #0062cc;" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+          </svg>
+          </div>
+        </div>
+        
+        <!-- Body Content -->
+        <div class="body-content" style="padding: 35px 30px; background-color: #ffffff;">
+          <h2 class="greeting" style="color: #1a365d; font-size: 20px; font-weight: 600; margin-top: 0;">Hello ${userName},</h2>
+          
+          <p class="text-content" style="color: #4a5568; line-height: 1.6; font-size: 16px; margin-bottom: 25px;">There is an update regarding a blocker on your project. Here are the details:</p>
+          
+          <!-- Modern Project Card -->
+          <div class="project-card" style="background: linear-gradient(to right, #f8fafc, #f1f5f9); border-radius: 12px; padding: 25px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06); position: relative; overflow: hidden; border: 1px solid #e5e7eb;">
+            <!-- Decorative elements -->
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 5px; background: linear-gradient(to right, #0062cc, #00a5ff);"></div>
+            
+            <h3 class="project-title" style="margin-top: 5px; margin-bottom: 20px; color: #0062cc; font-size: 22px; font-weight: 700;">${projectName}</h3>
+            
+            <div style="display: grid; grid-template-columns: 140px 1fr; gap: 12px; font-size: 15px;">
+              <div class="data-label" style="color: #64748b; font-weight: 500; display: flex; align-items: center;">
+                <svg style="width: 18px; height: 18px; margin-right: 8px; color: #0062cc;" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                </svg>
+                Project ID:
+              </div>
+              <div class="data-value" style="color: #334155; font-weight: 500;">#${safeProjectId}</div>
+              
+              <div class="data-label" style="color: #64748b; font-weight: 500; display: flex; align-items: center;">
+                <svg style="width: 18px; height: 18px; margin-right: 8px; color: #0062cc;" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                </svg>
+                Updated By:
+              </div>
+              <div class="data-value" style="color: #334155; font-weight: 500;">${updatedBy}</div>
+              
+              <div class="data-label" style="color: #64748b; font-weight: 500; display: flex; align-items: center;">
+                <svg style="width: 18px; height: 18px; margin-right: 8px; color: #0062cc;" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+                </svg>
+                Date Updated:
+              </div>
+              <div class="data-value" style="color: #334155;">${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+            </div>
+          </div>
+          
+          <!-- Blocker Details Box -->
+          <div class="update-box" style="background-color: #FEF3F2; border: 1px solid #FECACA; border-left: 6px solid #E53E3E; border-radius: 8px; padding: 20px; margin: 25px 0;">
+            <h4 style="margin-top: 0; margin-bottom: 12px; color: #E53E3E; font-size: 18px; font-weight: 600; display: flex; align-items: center;">
+              <svg style="width: 20px; height: 20px; margin-right: 8px;" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 2a1 1 0 011 1v1a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+              </svg>
+              Blocker Details
+            </h4>
+            <div style="background-color: white; border-radius: 6px; padding: 15px; color: #4a5568; font-size: 15px; line-height: 1.6;">
+              <p style="margin-top: 0;">The following blocker has been added/updated:</p>
+              <p style="margin: 8px 0; font-weight: 500;">${blockerDetails}</p>
+            </div>
+          </div>
+          
+          <p class="text-content" style="color: #4a5568; line-height: 1.6; font-size: 16px; margin-bottom: 25px;">
+            Login to the project management system to view all the recent changes and updates.
+          </p>
+          
+          <!-- Modern Action Button -->
+          <div style="text-align: center; margin: 35px 0 25px;">
+            <a href="${config.public.appUrl || 'http://localhost:3000'}/projects/${safeProjectId}" 
+               style="background: linear-gradient(to right, #0062cc, #0096ff); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 16px; transition: all 0.2s; box-shadow: 0 4px 10px rgba(0, 98, 204, 0.25);">
+              <span style="display: inline-flex; align-items: center; justify-content: center;">
+                <span>View Project Details</span>
+                <svg style="width: 18px; height: 18px; margin-left: 8px;" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+              </span>
+            </a>
+          </div>
+          
+          <div class="help-box" style="margin-top: 30px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #f8fafc;">
+            <h4 style="margin-top: 0; margin-bottom: 12px; color: #0062cc; font-size: 16px; font-weight: 600;">Need assistance?</h4>
+            <p class="text-content" style="color: #4a5568; font-size: 14px; line-height: 1.6; margin-bottom: 0;">If you have any questions about this blocker update, please contact your project manager or team lead.</p>
+          </div>
+        </div>
+        
+        <!-- Modern Footer -->
+        <div class="footer" style="background: linear-gradient(to right, #f1f5f9, #f8fafc); padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+          <p class="footer-text" style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0 0 8px;">© ${new Date().getFullYear()} ${APP_NAME}. All rights reserved.</p>
+          <p class="footer-text" style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 0;">This is an automated email. Please do not reply to this message.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return await sendEmail(userEmail, subject, html);
+}
+
+/**
+ * Send notification about project updates
+ */
+export async function sendProjectUpdateNotification(
+  recipientEmail: string,
+  recipientName: string,
+  projectName: string,
+  projectId: string,
+  updatedFields: string[],
+  updatedBy: string
+) {
+  console.log(`📧 [Email Service] Sending project update notification to ${recipientEmail} for project '${projectName}'`);
+  
+  try {
+    // Create a formatted list of updated fields
+    const fieldsList = updatedFields.map(field => {
+      // Convert camelCase to Title Case (e.g., "startDate" becomes "Start Date")
+      const formatted = field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+      return `• ${formatted}`;
+    }).join('\n');
+    
+    const subject = `Project Updated: ${projectName}`;
+    const text = `
+Hello ${recipientName},
+
+The project "${projectName}" has been updated by ${updatedBy}.
+
+The following fields were updated:
+${fieldsList}
+
+You can view the project details here: ${process.env.PUBLIC_URL}/projects/${projectId}
+
+Regards,
+The Project Management Team
+    `.trim();
+    
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background-color: #4a6fdc; color: white; padding: 10px 20px; border-radius: 5px 5px 0 0; }
+    .content { padding: 20px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; }
+    .footer { margin-top: 20px; font-size: 12px; color: #666; }
+    .btn { display: inline-block; padding: 10px 20px; background-color: #4a6fdc; color: white; text-decoration: none; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Project Update Notification</h2>
+    </div>
+    <div class="content">
+      <p>Hello ${recipientName},</p>
+      <p>The project <strong>"${projectName}"</strong> has been updated by <strong>${updatedBy}</strong>.</p>
+      <p>The following fields were updated:</p>
+      <ul>
+        ${updatedFields.map(field => {
+          const formatted = field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+          return `<li>${formatted}</li>`;
+        }).join('')}
+      </ul>
+      <p>
+        <a href="${process.env.PUBLIC_URL || 'http://localhost:3000'}/projects/${projectId}" class="btn">View Project</a>
+      </p>
+    </div>
+    <div class="footer">
+      <p>This is an automated message, please do not reply to this email.</p>
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+    
+    console.log(`📧 [Email Service] Sending email to: ${recipientEmail}, subject: ${subject}, attempt: 1`);
+    
+    // Send the email
+    const result = await sendEmail(recipientEmail, subject, text, html);
+    
+    console.log(`📧 [Email Service] Email sent successfully:`, result.messageId);
+    
+    return {
+      success: true,
+      messageId: result.messageId
+    };
+  } catch (error) {
+    console.error(`❌ [Email Service] Failed to send project update notification:`, error);
+    if (error instanceof Error) {
+      console.error('Stack trace:', error.stack);
+    }
+    throw error;
+  }
 }
