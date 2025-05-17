@@ -25,6 +25,13 @@ const error = ref(null);
 // Store the MongoDB ObjectId once we have it
 const mongoObjectId = ref(null);
 
+// Collapsible sections state for progressive disclosure
+const projectDescriptionExpanded = ref(false);
+const blockersExpanded = ref(false);
+const externalLinksExpanded = ref(false);
+const teamInfoExpanded = ref(false);
+const timelineExpanded = ref(false);
+
 // New update form state
 const newUpdate = ref('');
 const isSubmittingUpdate = ref(false);
@@ -507,8 +514,9 @@ const hasExternalLinks = computed(() => {
       <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
         <div>
           <div class="flex items-center">
-            <h1 class="text-2xl font-bold text-neutral-900">{{ project.name }}</h1>
+            <h1 class="text-2xl font-bold text-neutral-900">{{ project?.name }}</h1>
             <span 
+              v-if="project && project.status"
               :class="[
                 'ml-4 px-3 py-1 text-xs font-medium rounded-full',
                 project.status === 'Completed' ? 'bg-success-100 text-success-800' : 
@@ -521,12 +529,14 @@ const hasExternalLinks = computed(() => {
               {{ project.status }}
             </span>
           </div>
-          <p class="text-neutral-600 mt-1">Project ID: {{ project.id }}</p>
+          <p class="text-neutral-600 mt-1">Project ID: {{ project?.id }}</p>
         </div>
         
-        <div class="flex mt-4 md:mt-0 space-x-3" v-if="canEdit">
+        <!-- Primary Action Buttons - At the top of the page -->
+        <div class="flex items-center space-x-3 mt-4 md:mt-0">
+          <!-- Edit Project - Only show when not editing -->
           <button 
-            v-if="!isEditing"
+            v-if="!isEditing && canEdit"
             @click="toggleEditMode" 
             class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 shadow-sm"
           >
@@ -534,6 +544,17 @@ const hasExternalLinks = computed(() => {
             Edit Project
           </button>
           
+          <!-- Mark as completed - Only show when project isn't completed and user has edit permission -->
+          <button 
+            v-if="!isEditing && project?.status !== 'Completed' && canEdit"
+            @click="markProjectCompleted"
+            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md bg-success-600 text-white hover:bg-success-700 shadow-sm"
+          >
+            <span class="mdi mdi-check-circle text-lg mr-2"></span>
+            Mark Completed
+          </button>
+          
+          <!-- Save/Cancel - Only show during edit mode -->
           <button 
             v-if="isEditing"
             @click="saveProject" 
@@ -548,18 +569,154 @@ const hasExternalLinks = computed(() => {
             @click="toggleEditMode" 
             class="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md bg-white text-neutral-700 hover:bg-neutral-50"
           >
-            <span class="mdi mdi-cancel text-lg mr-2"></span>
+            <span class="mdi mdi-close text-lg mr-2"></span>
             Cancel
           </button>
+        </div>
+      </div>
+
+      <!-- KPI Dashboard - New compact dashboard showing key metrics -->
+      <div class="bg-white rounded-xl shadow-lg p-5 mb-6 border-l-4 border-primary-600">
+        <h2 class="text-lg font-semibold text-neutral-800 mb-4 flex items-center">
+          <span class="mdi mdi-chart-box text-xl text-primary-600 mr-2"></span>
+          Project Dashboard
+        </h2>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Progress KPI -->
+          <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow p-4 border border-neutral-100 flex flex-col justify-between">
+            <div class="flex justify-between items-start mb-3">
+              <div class="text-neutral-500 text-sm font-medium">Completion</div>
+              <div 
+                :class="[
+                  'text-xs px-2 py-0.5 rounded-full',
+                  project?.progress >= 75 ? 'bg-success-100 text-success-800' : 
+                  project?.progress >= 50 ? 'bg-accent-100 text-accent-800' : 
+                  'bg-warning-100 text-warning-800'
+                ]"
+              >
+                {{ progressStatus }}
+              </div>
+            </div>
+            <div class="flex items-end justify-between">
+              <div class="text-2xl font-bold text-neutral-900">{{ project?.progress || 0 }}%</div>
+              <div class="w-20 h-20 relative">
+                <svg class="w-full h-full" viewBox="0 0 36 36">
+                  <path
+                    class="stroke-current text-neutral-200"
+                    fill="none"
+                    stroke-width="3.8"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  <path
+                    :class="[
+                      'stroke-current',
+                      project?.progress >= 75 ? 'text-success-600' : 
+                      project?.progress >= 50 ? 'text-accent-600' : 
+                      'text-warning-600'
+                    ]"
+                    fill="none"
+                    stroke-width="3.8"
+                    :stroke-dasharray="`${project?.progress || 0}, 100`"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
           
-          <button 
-            v-if="!isEditing && project.status !== 'Completed' && canEdit"
-            @click="markProjectCompleted"
-             class="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md bg-white text-neutral-700 hover:bg-neutral-50"
-          >
-            <span class="mdi mdi-check-circle text-lg mr-2 text-success-600"></span>
-            Mark Completed
-          </button>
+          <!-- Timeline KPI -->
+          <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow p-4 border border-neutral-100 flex flex-col justify-between">
+            <div class="flex justify-between items-start mb-3">
+              <div class="text-neutral-500 text-sm font-medium">Timeline</div>
+              <div 
+                :class="[
+                  'text-xs px-2 py-0.5 rounded-full',
+                  isOverdue ? 'bg-error-100 text-error-800' :
+                  daysRemaining < 7 ? 'bg-warning-100 text-warning-800' :
+                  'bg-success-100 text-success-800'
+                ]"
+              >
+                {{ isOverdue ? 'Overdue' : daysRemaining < 7 ? 'Due soon' : 'On track' }}
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-2xl font-bold text-neutral-900">{{ Math.abs(daysRemaining) }}</div>
+                <div class="text-sm text-neutral-600">{{ isOverdue ? 'Days overdue' : 'Days left' }}</div>
+              </div>
+              <div 
+                :class="[
+                  'flex items-center justify-center w-12 h-12 rounded-full text-white text-xl',
+                  isOverdue ? 'bg-error-600' :
+                  daysRemaining < 7 ? 'bg-warning-600' : 
+                  'bg-success-600'
+                ]"
+              >
+                <span v-if="isOverdue" class="mdi mdi-alert-circle"></span>
+                <span v-else-if="daysRemaining < 7" class="mdi mdi-clock-alert"></span>
+                <span v-else class="mdi mdi-calendar-check"></span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Team KPI -->
+          <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow p-4 border border-neutral-100 flex flex-col justify-between">
+            <div class="flex justify-between items-start mb-3">
+              <div class="text-neutral-500 text-sm font-medium">Team</div>
+              <div class="text-xs px-2 py-0.5 rounded-full bg-primary-100 text-primary-800">
+                {{ formattedTeamData.total }} members
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="flex-1">
+                <div class="text-2xl font-bold text-neutral-900">{{ formattedTeamData.total }}</div>
+                <div class="flex flex-wrap gap-2 mt-1">
+                  <span class="text-xs px-2 py-0.5 bg-accent-100 text-accent-800 rounded-full">
+                    {{ formattedTeamData.members }} Team
+                  </span>
+                  <span class="text-xs px-2 py-0.5 bg-success-100 text-success-800 rounded-full">
+                    {{ formattedTeamData.developers }} Devs
+                  </span>
+                </div>
+              </div>
+              <div class="w-12 h-12 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xl">
+                <span class="mdi mdi-account-group"></span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Status KPI -->
+          <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow p-4 border border-neutral-100 flex flex-col justify-between">
+            <div class="flex justify-between items-start mb-3">
+              <div class="text-neutral-500 text-sm font-medium">Blockers</div>
+              <div 
+                :class="[
+                  'text-xs px-2 py-0.5 rounded-full',
+                  project?.blockers ? 'bg-error-100 text-error-800' : 'bg-success-100 text-success-800'
+                ]"
+              >
+                {{ project?.blockers ? 'Has blockers' : 'No blockers' }}
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-2xl font-bold text-neutral-900">
+                  {{ project?.priority || 'N/A' }}
+                </div>
+                <div class="text-sm text-neutral-600">Priority</div>
+              </div>
+              <div 
+                :class="[
+                  'flex items-center justify-center w-12 h-12 rounded-full text-white text-xl',
+                  project?.blockers ? 'bg-error-600' : 'bg-success-600',
+                ]"
+              >
+                <span v-if="project?.blockers" class="mdi mdi-alert-octagon"></span>
+                <span v-else class="mdi mdi-check-circle"></span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -1110,8 +1267,8 @@ const hasExternalLinks = computed(() => {
                   ></div>
                 </div>
                 <div class="flex justify-between mt-2">
-                  <div class="text-xs font-medium">{{ editedProject.startDate }}</div>
-                  <div class="text-xs font-medium">{{ editedProject.endDate }}</div>
+                  <div class="text-xs font-medium">{{ project.startDate }}</div>
+                  <div class="text-xs font-medium">{{ project.endDate }}</div>
                 </div>
               </div>
             </div>
@@ -1343,81 +1500,6 @@ const hasExternalLinks = computed(() => {
         </div>
       </div>
       
-      <!-- Progress Summary Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <!-- Progress Card -->
-        <div class="bg-white rounded-lg shadow-card p-4">
-          <h3 class="text-sm font-medium text-neutral-500 mb-2">Project Progress</h3>
-          <div class="flex items-center mb-2">
-            <div class="text-3xl font-bold text-neutral-900 mr-2">{{ project.progress }}%</div>
-            <div 
-              :class="[
-                'text-sm font-medium px-2 py-1 rounded',
-                project.progress >= 75 ? 'bg-success-100 text-success-700' : 
-                project.progress >= 50 ? 'bg-accent-100 text-accent-700' :
-                'bg-warning-100 text-warning-700'
-              ]"
-            >
-              {{ progressStatus }}
-            </div>
-          </div>
-          <div class="w-full bg-neutral-200 rounded-full h-3 mb-2">
-            <div 
-              :class="[
-                'h-3 rounded-full',
-                project.progress >= 75 ? 'bg-success-600' : 
-                project.progress >= 50 ? 'bg-accent-600' :
-                'bg-warning-600'
-              ]"
-              :style="`width: ${project.progress}%`"
-            ></div>
-          </div>
-          <p class="text-sm text-neutral-600">Last updated: {{ project.lastUpdated }}</p>
-        </div>
-        
-        <!-- Timeline Card -->
-        <div class="bg-white rounded-lg shadow-card p-4">
-          <h3 class="text-sm font-medium text-neutral-500 mb-2">Timeline</h3>
-          <div class="flex items-center mb-2">
-            <div class="text-3xl font-bold text-neutral-900 mr-2">{{ Math.abs(daysRemaining) }}</div>
-            <div 
-              :class="[
-                'text-sm font-medium px-2 py-1 rounded',
-                isOverdue ? 'bg-error-100 text-error-700' : 'bg-neutral-100 text-neutral-700'
-              ]"
-            >
-              {{ isOverdue ? 'Days Overdue' : 'Days Remaining' }}
-            </div>
-          </div>
-          <div class="text-sm text-neutral-600">
-            <div class="flex items-center mb-1">
-              <span class="mdi mdi-calendar-start text-lg mr-2 text-neutral-500"></span>
-              Start: {{ project.startDate }}
-            </div>
-            <div class="flex items-center">
-              <span class="mdi mdi-calendar-end text-lg mr-2 text-neutral-500"></span>
-              Due: {{ project.endDate }}
-            </div>
-          </div>
-        </div>
-        
-        <!-- Team Card -->
-        <div class="bg-white rounded-lg shadow-card p-4">
-          <h3 class="text-sm font-medium text-neutral-500 mb-2">Team</h3>
-          <div class="flex items-center mb-3">
-            <div class="text-lg font-medium text-neutral-900 mr-2">Assigned to:</div>
-            <div class="text-lg text-neutral-800">{{ getUserName(project.assignedTo) }}</div>
-          </div>
-          <div v-if="project.team && project.team.length" class="text-sm text-neutral-600">
-            <div class="font-medium mb-1">Team Members:</div>
-            <div v-for="(member, index) in project.team" :key="index" class="flex items-center mb-1">
-              <span class="mdi mdi-account text-lg mr-2 text-neutral-500"></span>
-              {{ getUserName(member) }}
-            </div>
-          </div>
-          <div v-else class="text-neutral-600 text-sm italic">No team members assigned</div>
-        </div>
-      </div>
       
       <!-- Tabs Navigation -->
       <div class="border-b border-neutral-200 mb-6">
@@ -1505,17 +1587,6 @@ const hasExternalLinks = computed(() => {
                     <span class="text-sm text-neutral-600">Category:</span>
                     <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.category }}</span>
                   </div>
-                  <div class="flex items-center">
-                    <span class="mdi mdi-flag text-primary-600 mr-2"></span>
-                    <span class="text-sm text-neutral-600">Priority:</span>
-                    <span :class="[
-                      'text-sm font-medium ml-2 px-2 py-0.5 rounded-full text-xs',
-                      project.priority === 'Urgent' ? 'bg-error-100 text-error-700' :
-                      project.priority === 'High' ? 'bg-warning-100 text-warning-700' :
-                      project.priority === 'Medium' ? 'bg-accent-100 text-accent-700' :
-                      'bg-success-100 text-success-700'
-                    ]">{{ project.priority }}</span>
-                  </div>
                 </div>
               </div>
               <div class="h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center">
@@ -1529,22 +1600,8 @@ const hasExternalLinks = computed(() => {
             <div class="flex items-start justify-between">
               <div>
                 <h3 class="text-md font-semibold text-neutral-900 mb-3">Status Details</h3>
-                <div class="space-y-2">
-                  <div class="flex items-center">
-                    <span class="mdi mdi-playlist-check text-accent-600 mr-2"></span>
-                    <span class="text-sm text-neutral-600">Status Phase:</span>
-                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.statusPhase || 'Not specified' }}</span>
-                  </div>
-                  <div class="flex items-center">
-                    <span class="mdi mdi-calendar-clock text-accent-600 mr-2"></span>
-                    <span class="text-sm text-neutral-600">Pending Days:</span>
-                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.pendingDays || 0 }} days</span>
-                  </div>
-                  <div class="flex items-center">
-                    <span class="mdi mdi-calendar-plus text-accent-600 mr-2"></span>
-                    <span class="text-sm text-neutral-600">Initially Raised:</span>
-                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.initiallyRaisedOn || project.startDate }}</span>
-                  </div>
+                <div class="text-sm text-neutral-600">
+                  Status information is available in the dashboard and timeline sections.
                 </div>
               </div>
               <div class="h-12 w-12 rounded-full bg-accent-100 flex items-center justify-center">
@@ -1562,7 +1619,7 @@ const hasExternalLinks = computed(() => {
                   <div class="flex items-center">
                     <span class="mdi mdi-account-star text-success-600 mr-2"></span>
                     <span class="text-sm text-neutral-600">Responsible Person:</span>
-                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ project.responsiblePerson || project.assignedTo }}</span>
+                    <span class="text-sm font-medium text-neutral-800 ml-2">{{ getUserName(project.responsiblePerson) || getUserName(project.assignedTo) }}</span>
                   </div>
                   <div class="flex items-center">
                     <span class="mdi mdi-laptop text-success-600 mr-2"></span>
@@ -1583,62 +1640,124 @@ const hasExternalLinks = computed(() => {
           </div>
         </div>
         
-        <!-- Project Description Details -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transition-all duration-300 hover:shadow-lg">
-            <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
-              <span class="mdi mdi-message-text-outline text-lg text-primary-600 mr-2"></span>
-              Remarks
-            </h3>
-            <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.remarks || 'No remarks provided' }}</p>
-          </div>
+        <!-- Collapsible Sections - Progressive Disclosure -->
+        
+        <!-- Project Description Section (Expandable) -->
+        <div class="mb-6">
+          <button 
+            @click="projectDescriptionExpanded = !projectDescriptionExpanded"
+            class="w-full flex items-center justify-between bg-white rounded-lg shadow-sm border border-neutral-200 p-4 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 transition-colors"
+          >
+            <div class="flex items-center">
+              <div class="rounded-full bg-primary-100 p-2 mr-3">
+                <span class="mdi mdi-message-text-outline text-lg text-primary-600"></span>
+              </div>
+              <h3 class="text-md font-semibold text-neutral-800">Project Description Details</h3>
+            </div>
+            <span class="mdi text-lg" :class="projectDescriptionExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></span></button>
           
-          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transition-all duration-300 hover:shadow-lg">
-            <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
-              <span class="mdi mdi-clipboard-text-outline text-lg text-primary-600 mr-2"></span>
-              Notes
-            </h3>
-            <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.notes || 'No notes provided' }}</p>
+          <div 
+            v-show="projectDescriptionExpanded" 
+            class="bg-white rounded-b-lg shadow-md border-x border-b border-neutral-200 p-5 mt-1 transition-all duration-300"
+          >
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200">
+                <h4 class="text-sm font-semibold text-neutral-800 mb-2 flex items-center">
+                  <span class="mdi mdi-message-text-outline text-primary-600 mr-2"></span>
+                  Remarks
+                </h4>
+                <p class="text-neutral-700 bg-white p-3 rounded-md border border-neutral-100">{{ project.remarks || 'No remarks provided' }}</p>
+              </div>
+              
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200">
+                <h4 class="text-sm font-semibold text-neutral-800 mb-2 flex items-center">
+                  <span class="mdi mdi-clipboard-text-outline text-primary-600 mr-2"></span>
+                  Notes
+                </h4>
+                <p class="text-neutral-700 bg-white p-3 rounded-md border border-neutral-100">{{ project.notes || 'No notes provided' }}</p>
+              </div>
+            </div>
+            
+            <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200">
+              <h4 class="text-sm font-semibold text-neutral-800 mb-2 flex items-center">
+                <span class="mdi mdi-message-processing-outline text-primary-600 mr-2"></span>
+                Comments
+              </h4>
+              <p class="text-neutral-700 bg-white p-3 rounded-md border border-neutral-100">{{ project.comments || 'No comments added' }}</p>
+            </div>
           </div>
         </div>
         
-        <!-- Blockers & Feedback -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transition-all duration-300 hover:shadow-lg">
-            <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
-              <span class="mdi mdi-alert-circle text-lg text-error-600 mr-2"></span>
-              Blockers
-            </h3>
-            <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.blockers || 'No blockers reported' }}</p>
-          </div>
+        <!-- Blockers & Feedback Section (Expandable) -->
+        <div class="mb-6">
+          <button 
+            @click="blockersExpanded = !blockersExpanded"
+            class="w-full flex items-center justify-between bg-white rounded-lg shadow-sm border border-neutral-200 p-4 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 transition-colors"
+            :class="{'border-error-300': project.blockers}"
+          >
+            <div class="flex items-center">
+              <div class="rounded-full bg-error-100 p-2 mr-3">
+                <span class="mdi mdi-alert-circle text-lg text-error-600"></span>
+              </div>
+              <div>
+                <h3 class="text-md font-semibold text-neutral-800">Blockers & Feedback</h3>
+                <span v-if="project.blockers" class="text-xs text-error-600 font-medium">
+                  This project has active blockers
+                </span>
+              </div>
+            </div>
+            <span class="mdi text-lg" :class="blockersExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></span>
+          </button>
           
-          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transition-all duration-300 hover:shadow-lg">
-            <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
-              <span class="mdi mdi-message-reply text-lg text-accent-600 mr-2"></span>
-              Feedback on Blockers
-            </h3>
-            <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.feedbackForBlockers || 'No feedback provided' }}</p>
+          <div 
+            v-show="blockersExpanded" 
+            class="bg-white rounded-b-lg shadow-md border-x border-b border-neutral-200 p-5 mt-1 transition-all duration-300"
+          >
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200">
+                <h4 class="text-sm font-semibold text-neutral-800 mb-2 flex items-center">
+                  <span class="mdi mdi-alert-circle text-error-600 mr-2"></span>
+                  Blockers
+                </h4>
+                <div :class="[
+                  'text-neutral-700 p-3 rounded-md border',
+                  project.blockers ? 'bg-error-50 border-error-200' : 'bg-white border-neutral-100'
+                ]">
+                  {{ project.blockers || 'No blockers reported' }}
+                </div>
+              </div>
+              
+              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200">
+                <h4 class="text-sm font-semibold text-neutral-800 mb-2 flex items-center">
+                  <span class="mdi mdi-message-reply text-accent-600 mr-2"></span>
+                  Feedback on Blockers
+                </h4>
+                <p class="text-neutral-700 bg-white p-3 rounded-md border border-neutral-100">{{ project.feedbackForBlockers || 'No feedback provided' }}</p>
+              </div>
+            </div>
           </div>
         </div>
         
-        <!-- Comments -->
-        <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transition-all duration-300 hover:shadow-lg">
-          <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
-            <span class="mdi mdi-message-processing-outline text-lg text-primary-600 mr-2"></span>
-            Comments
-          </h3>
-          <p class="text-neutral-700 bg-neutral-50 p-3 rounded-md">{{ project.comments || 'No comments added' }}</p>
-        </div>
-        
-        <!-- External Links Section - Add before the Team Information section -->
-        <div v-if="hasExternalLinks" class="mt-8">
-          <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
-            <span class="mdi mdi-link-variant text-lg text-purple-600 mr-2"></span>
-            External Resources
-          </h3>
+        <!-- External Links Section (Expandable) -->
+        <div v-if="hasExternalLinks" class="mb-6">
+          <button 
+            @click="externalLinksExpanded = !externalLinksExpanded"
+            class="w-full flex items-center justify-between bg-white rounded-lg shadow-sm border border-neutral-200 p-4 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 transition-colors"
+          >
+            <div class="flex items-center">
+              <div class="rounded-full bg-purple-100 p-2 mr-3">
+                <span class="mdi mdi-link-variant text-lg text-purple-600"></span>
+              </div>
+              <h3 class="text-md font-semibold text-neutral-800">External Resources</h3>
+            </div>
+            <span class="mdi text-lg" :class="externalLinksExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></span>
+          </button>
           
-          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 mt-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div 
+            v-show="externalLinksExpanded" 
+            class="bg-white rounded-b-lg shadow-md border-x border-b border-neutral-200 p-5 mt-1 transition-all duration-300"
+          >
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               <!-- GitHub Repository -->
               <div v-if="project.externalLinks.githubRepo" 
                   class="bg-neutral-50 p-4 rounded-lg border border-l-4 border-l-neutral-800 transition-all duration-200 hover:shadow-md"
@@ -1699,105 +1818,109 @@ const hasExternalLinks = computed(() => {
           </div>
         </div>
         
-        <!-- Team Information Section -->
-        <div class="mt-8">
-          <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
-            <span class="mdi mdi-account-group text-lg text-primary-600 mr-2"></span>
-            Team Information
-          </h3>
+        <!-- Team Information Section (Expandable) -->
+        <div class="mb-6">
+          <button 
+            @click="teamInfoExpanded = !teamInfoExpanded"
+            class="w-full flex items-center justify-between bg-white rounded-lg shadow-sm border border-neutral-200 p-4 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 transition-colors"
+          >
+            <div class="flex items-center">
+              <div class="rounded-full bg-success-100 p-2 mr-3">
+                <span class="mdi mdi-account-group text-lg text-success-600"></span>
+              </div>
+              <h3 class="text-md font-semibold text-neutral-800">Team Information</h3>
+            </div>
+            <span class="mdi text-lg" :class="teamInfoExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></span>
+          </button>
           
-          <!-- Team Members -->
-          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 mt-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div 
+            v-show="teamInfoExpanded" 
+            class="bg-white rounded-b-lg shadow-md border-x border-b border-neutral-200 p-5 mt-1 transition-all duration-300"
+          >
+            <!-- Team Members -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <h4 class="text-sm font-medium text-neutral-600 mb-2">Lead & Assignee</h4>
                 <div class="bg-neutral-50 p-4 rounded-lg">
-                  <div class="flex items-center mb-3">
-                    <div class="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
-                      <span class="mdi mdi-account text-xl text-primary-600"></span>
-                    </div>
-                    <div>
-                      <div class="text-sm font-medium text-neutral-900">{{ getUserName(project.assignedTo) }}</div>
-                      <div class="text-xs text-neutral-500">Project Lead</div>
-                    </div>
-                  </div>
-                  
-                  <div v-if="project.responsiblePerson && project.responsiblePerson !== project.assignedTo" class="flex items-center">
-                    <div class="h-10 w-10 rounded-full bg-accent-100 flex items-center justify-center mr-3">
-                      <span class="mdi mdi-account-star text-xl text-accent-600"></span>
-                    </div>
-                    <div>
-                      <div class="text-sm font-medium text-neutral-900">{{ getUserName(project.responsiblePerson) }}</div>
-                      <div class="text-xs text-neutral-500">Responsible Person</div>
-                    </div>
-                  </div>
+                  <p class="text-sm text-neutral-500">Project lead and responsible person information is displayed in the Team tab.</p>
                 </div>
               </div>
               
               <div>
                 <h4 class="text-sm font-medium text-neutral-600 mb-2">Team Members</h4>
                 <div class="bg-neutral-50 p-4 rounded-lg">
-                  <div v-if="project.team && project.team.length" class="flex flex-wrap gap-2">
-                    <div v-for="(member, index) in project.team" :key="index" 
-                      class="px-3 py-1 bg-white rounded-full border border-neutral-200 text-sm flex items-center">
-                      <span class="mdi mdi-account text-xs text-neutral-500 mr-1"></span>
-                      {{ getUserName(member) }}
-                    </div>
-                  </div>
-                  <div v-else class="text-sm text-neutral-500 italic">No team members assigned</div>
+                  <p class="text-sm text-neutral-500">Detailed team information is available in the Team tab.</p>
                 </div>
               </div>
             </div>
             
-            <!-- Developers Section -->
-            <div v-if="project.developers && project.developers.length" class="mt-4">
-              <h4 class="text-sm font-medium text-neutral-600 mb-2">Developers</h4>
-              <div class="bg-neutral-50 p-4 rounded-lg">
-                <div class="flex flex-wrap gap-2">
-                  <div v-for="(dev, index) in project.developers" :key="index"
-                    class="px-3 py-1 bg-white rounded-full border border-neutral-200 text-sm flex items-center">
-                    <span class="mdi mdi-laptop text-xs text-neutral-500 mr-1"></span>
-                    {{ getUserName(dev) }}
-                  </div>
-                </div>
-              </div>
+            <!-- Simplified redirecting message -->
+            <div class="mt-4">
+              <button 
+                @click="activeTab = 'team'"
+                class="inline-flex items-center px-4 py-2 border border-primary-300 text-sm font-medium rounded-md bg-white text-primary-700 hover:bg-primary-50 transition-colors"
+              >
+                <span class="mdi mdi-account-group mr-2"></span>
+                View Complete Team Details
+              </button>
             </div>
           </div>
         </div>
         
-        <!-- Timeline Section -->
-        <div class="mt-8">
-          <h3 class="text-md font-semibold text-neutral-800 mb-3 flex items-center">
-            <span class="mdi mdi-calendar-range text-lg text-primary-600 mr-2"></span>
-            Timeline Information
-          </h3>
-          
-          <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 mt-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <!-- Timeline Visualization -->
-              <div class="md:col-span-3">
-                <div class="relative pt-6 pb-2">
-                  <div class="absolute left-0 right-0 top-0 flex justify-between px-6">
-                    <div class="text-xs text-neutral-500">Start</div>
-                    <div class="text-xs text-neutral-500">End</div>
-                  </div>
-                  <div class="h-3 bg-neutral-100 rounded-full overflow-hidden relative">
-                    <div
-                      class="absolute h-full bg-primary-500 rounded-full"
-                      :style="{
-                        width: isOverdue ? '100%' : `${project.progress}%`,
-                        backgroundColor: isOverdue ? 'var(--color-error-600)' : undefined
-                      }"
-                    ></div>
-                  </div>
-                  <div class="flex justify-between mt-2">
-                    <div class="text-xs font-medium">{{ project.startDate }}</div>
-                    <div class="text-xs font-medium">{{ project.endDate }}</div>
-                  </div>
-                </div>
+        <!-- Timeline Section (Expandable) -->
+        <div class="mb-6">
+          <button 
+            @click="timelineExpanded = !timelineExpanded"
+            class="w-full flex items-center justify-between bg-white rounded-lg shadow-sm border border-neutral-200 p-4 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 transition-colors"
+            :class="{'border-warning-300': isOverdue}"
+          >
+            <div class="flex items-center">
+              <div :class="[
+                'rounded-full p-2 mr-3',
+                isOverdue ? 'bg-warning-100' : 'bg-accent-100'
+              ]">
+                <span :class="[
+                  'mdi mdi-calendar-range text-lg',
+                  isOverdue ? 'text-warning-600' : 'text-accent-600'
+                ]"></span>
               </div>
-              
-              <!-- Date Information -->
+              <div>
+                <h3 class="text-md font-semibold text-neutral-800">Timeline Information</h3>
+                <span v-if="isOverdue" class="text-xs text-warning-600 font-medium">
+                  Project is overdue
+                </span>
+              </div>
+            </div>
+            <span class="mdi text-lg" :class="timelineExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></span>
+          </button>
+          
+          <div 
+            v-show="timelineExpanded" 
+            class="bg-white rounded-b-lg shadow-md border-x border-b border-neutral-200 p-5 mt-1 transition-all duration-300"
+          >
+            <!-- Timeline Visualization -->
+            <div class="relative pt-6 pb-2 mb-6">
+              <div class="absolute left-0 right-0 top-0 flex justify-between px-6">
+                <div class="text-xs text-neutral-500">Start</div>
+                <div class="text-xs text-neutral-500">End</div>
+              </div>
+              <div class="h-3 bg-neutral-100 rounded-full overflow-hidden relative">
+                <div
+                  class="absolute h-full bg-primary-500 rounded-full"
+                  :style="{
+                    width: isOverdue ? '100%' : `${project.progress}%`,
+                    backgroundColor: isOverdue ? 'var(--color-error-600)' : undefined
+                  }"
+                ></div>
+              </div>
+              <div class="flex justify-between mt-2">
+                <div class="text-xs font-medium">{{ project.startDate }}</div>
+                <div class="text-xs font-medium">{{ project.endDate }}</div>
+              </div>
+            </div>
+            
+            <!-- Date Information -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div class="bg-neutral-50 p-4 rounded-lg flex flex-col justify-between">
                 <h4 class="text-sm font-medium text-neutral-600 mb-2">Project Start</h4>
                 <div>
