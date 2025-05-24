@@ -2119,6 +2119,7 @@ onUnmounted(() => {
         <div class="mb-6">
           <JiraProjectLinker 
             :project="project" 
+            @project-updated="fetchProject"
             @project-linked="fetchProject"
             @project-unlinked="fetchProject"
             @project-synced="fetchProject"
@@ -2131,7 +2132,9 @@ onUnmounted(() => {
           <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow-lg p-5 border-l-4 border-primary-500 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
             <div class="flex items-start justify-between">
               <div>
-                <h3 class="text-md font-semibold text-neutral-900 mb-3">Basic Information</h3>
+                <h3 class="text-md font-semibold text-neutral-900 mb-3">
+                  Basic Information
+                </h3>
                 <div class="space-y-2">
                   <div class="flex items-center">
                     <span class="mdi mdi-office-building text-primary-600 mr-2"></span>
@@ -2155,7 +2158,9 @@ onUnmounted(() => {
           <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow-lg p-5 border-l-4 border-accent-500 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
             <div class="flex items-start justify-between">
               <div>
-                <h3 class="text-md font-semibold text-neutral-900 mb-3">Status Details</h3>
+                <h3 class="text-md font-semibold text-neutral-900 mb-3">
+                  Status Details
+                </h3>
                 <div class="text-sm text-neutral-600">
                   Status information is available in the dashboard and timeline sections.
                 </div>
@@ -2170,7 +2175,9 @@ onUnmounted(() => {
           <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow-lg p-5 border-l-4 border-success-500 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
             <div class="flex items-start justify-between">
               <div>
-                <h3 class="text-md font-semibold text-neutral-900 mb-3">Responsibility</h3>
+                <h3 class="text-md font-semibold text-neutral-900 mb-3">
+                  Responsibility
+                </h3>
                 <div class="space-y-2">
                   <div class="flex items-center">
                     <span class="mdi mdi-account-star text-success-600 mr-2"></span>
