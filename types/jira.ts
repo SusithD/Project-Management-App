@@ -120,3 +120,91 @@ export interface JiraUser {
   timeZone: string;
   locale: string;
 }
+
+// Webhook Types
+export interface JiraWebhookEvent {
+  timestamp: number;
+  webhookEvent: string;
+  issue?: JiraIssue;
+  user: JiraUser;
+  changelog?: {
+    id: string;
+    items: Array<{
+      field: string;
+      fieldtype: string;
+      from: string;
+      fromString: string;
+      to: string;
+      toString: string;
+    }>;
+  };
+}
+
+export interface JiraWebhookConfig {
+  id: string;
+  name: string;
+  url: string;
+  events: string[];
+  filters?: {
+    issueRelatedEventsSection?: string;
+  };
+  excludeBody?: boolean;
+}
+
+// Bi-directional Sync Types
+export interface SyncConflict {
+  field: string;
+  jiraValue: any;
+  projectValue: any;
+  resolvedValue?: any;
+  resolution?: 'jira' | 'project' | 'manual';
+}
+
+export interface SyncResult {
+  success: boolean;
+  conflictsDetected: SyncConflict[];
+  conflictsResolved: SyncConflict[];
+  updatedFields: string[];
+  message: string;
+}
+
+export interface BiDirectionalSyncConfig {
+  enabled: boolean;
+  conflictResolution: 'jira_wins' | 'project_wins' | 'manual' | 'newest_wins';
+  syncFields: {
+    summary: boolean;
+    description: boolean;
+    status: boolean;
+    priority: boolean;
+    assignee: boolean;
+    dueDate: boolean;
+    progress: boolean;
+  };
+  lastSyncTimestamp?: string;
+}
+
+// Reporting Types
+export interface JiraReportMetrics {
+  totalIssues: number;
+  issuesByStatus: Record<string, number>;
+  issuesByPriority: Record<string, number>;
+  issuesByType: Record<string, number>;
+  averageResolutionTime: number;
+  velocity: {
+    current: number;
+    trend: number;
+  };
+  burndown: Array<{
+    date: string;
+    remaining: number;
+    completed: number;
+  }>;
+}
+
+export interface ProjectJiraMetrics {
+  projectId: string;
+  projectName: string;
+  jiraProjectKey: string;
+  metrics: JiraReportMetrics;
+  lastUpdated: string;
+}
