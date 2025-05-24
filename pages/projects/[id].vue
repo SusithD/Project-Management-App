@@ -7,6 +7,8 @@ import { useUsersStore } from '~/stores/users'; // Add this line to import users
 
 // Import the UserSelect component
 import UserSelect from '~/components/common/UserSelect.vue';
+import JiraProjectLinker from '~/components/jira/ProjectLinker.vue';
+import JiraIssuesDashboard from '~/components/jira/IssuesDashboard.vue';
 
 // Define layout
 definePageMeta({
@@ -480,6 +482,85 @@ const hasExternalLinks = computed(() => {
   const { githubRepo, figmaLink, jiraProject } = project.value.externalLinks;
   return !!(githubRepo || figmaLink || jiraProject);
 });
+
+// Add Jira-related reactive state
+const jiraProjectKey = ref(null);
+const jiraIntegrationActive = computed(() => {
+  // Check for Jira integration using the correct data structure
+  return (
+    project.value?.jiraIntegration?.enabled && 
+    project.value?.jiraIntegration?.projectKey
+  );
+});
+
+// Jira integration methods
+const isSyncing = ref(false);
+
+const syncJiraProject = async () => {
+  if (!project.value?.jiraIntegration?.projectKey) return;
+  
+  isSyncing.value = true;
+  try {
+    const response = await fetch('/api/jira/sync-project', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authStore.authHeader
+      },
+      body: JSON.stringify({
+        projectKey: project.value.jiraIntegration.projectKey,
+        projectId: mongoObjectId.value || project.value._id
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to sync Jira project: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    // Update project with sync timestamp
+    if (project.value.jiraIntegration) {
+      project.value.jiraIntegration.lastSyncDate = new Date().toISOString();
+    }
+    
+    notificationsStore.success('Jira project synced successfully');
+    
+    // Refresh project data to get latest sync info
+    await fetchProject();
+  } catch (err) {
+    console.error('Error syncing Jira project:', err);
+    notificationsStore.error('Failed to sync Jira project. Please try again.');
+  } finally {
+    isSyncing.value = false;
+  }
+};
+
+const openJiraProject = () => {
+  if (!project.value?.jiraIntegration?.projectKey) return;
+  
+  // Get the Jira base URL from runtime configuration
+  const config = useRuntimeConfig();
+  const jiraBaseUrl = config.jira?.baseUrl || config.public.jira?.baseUrl;
+  
+  if (!jiraBaseUrl) {
+    notificationsStore.error('Jira base URL is not configured');
+    return;
+  }
+  
+  const url = `${jiraBaseUrl}/browse/${project.value.jiraIntegration.projectKey}`;
+  window.open(url, '_blank');
+};
+
+const handleIssueSynced = (issueData) => {
+  notificationsStore.success(`Issue ${issueData.key} synced successfully`);
+  // Optionally refresh project data or update local state
+};
+
+const handleIssuesUpdated = (issuesData) => {
+  // Handle updates to issues data if needed
+  console.log('Issues updated:', issuesData);
+};
 </script>
 
 <template>
@@ -1513,6 +1594,7 @@ const hasExternalLinks = computed(() => {
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
           >
+            <span class="mdi mdi-view-dashboard mr-1"></span>
             Overview
           </button>
           <button 
@@ -1524,7 +1606,21 @@ const hasExternalLinks = computed(() => {
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
           >
+            <span class="mdi mdi-account-group mr-1"></span>
             Team
+          </button>
+          <button 
+            v-if="jiraIntegrationActive"
+            @click="activeTab = 'jira-issues'"
+            :class="[
+              'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
+              activeTab === 'jira-issues' 
+                ? 'border-primary-600 text-primary-600' 
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            ]"
+          >
+            <span class="mdi mdi-jira mr-1"></span>
+            Jira Issues
           </button>
           <button 
             @click="activeTab = 'updates'"
@@ -1535,6 +1631,7 @@ const hasExternalLinks = computed(() => {
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
           >
+            <span class="mdi mdi-message-text mr-1"></span>
             Updates
           </button>
           <button 
@@ -1546,6 +1643,7 @@ const hasExternalLinks = computed(() => {
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
           >
+            <span class="mdi mdi-file-document mr-1"></span>
             Files
           </button>
           <button 
@@ -1568,6 +1666,16 @@ const hasExternalLinks = computed(() => {
       <!-- Overview Tab -->
       <div v-if="activeTab === 'overview'" class="bg-white rounded-lg shadow-card p-6">
         <h2 class="text-lg font-medium text-neutral-900 mb-4">Project Details</h2>
+        
+        <!-- JIRA Integration Section -->
+        <div class="mb-6">
+          <JiraProjectLinker 
+            :project="project" 
+            @project-linked="fetchProject"
+            @project-unlinked="fetchProject"
+            @project-synced="fetchProject"
+          />
+        </div>
         
         <!-- Main Info Cards with Animation -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
@@ -1661,7 +1769,7 @@ const hasExternalLinks = computed(() => {
             class="bg-white rounded-b-lg shadow-md border-x border-b border-neutral-200 p-5 mt-1 transition-all duration-300"
           >
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
-              <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200">
+                           <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200">
                 <h4 class="text-sm font-semibold text-neutral-800 mb-2 flex items-center">
                   <span class="mdi mdi-message-text-outline text-primary-600 mr-2"></span>
                   Remarks
@@ -2557,6 +2665,109 @@ const hasExternalLinks = computed(() => {
             <p class="text-neutral-500 text-sm max-w-md mx-auto">
               External links to GitHub, Figma, or Jira help team members access important project resources.
               {{ canEdit ? 'Click "Edit Project" to add external links to this project.' : '' }}
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Jira Issues Tab -->
+      <div v-if="activeTab === 'jira-issues'" class="space-y-6">
+        <!-- Jira Integration Status Header -->
+        <div class="bg-white rounded-lg shadow-card p-6 border-l-4 border-blue-500">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center">
+              <div class="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center mr-3">
+                <span class="mdi mdi-jira text-2xl text-blue-600"></span>
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold text-neutral-800">Jira Integration</h2>
+                <p class="text-sm text-neutral-600">
+                  {{ project?.jiraProject?.projectKey ? `Connected to ${project.jiraProject.projectKey}` : 'Manage Jira project integration' }}
+                </p>
+              </div>
+            </div>
+            
+            <!-- Integration Status Badge -->
+            <div class="flex items-center space-x-3">
+              <span v-if="project?.jiraProject?.projectKey" 
+                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">
+                <span class="w-2 h-2 bg-success-500 rounded-full mr-2"></span>
+                Connected
+              </span>
+              <span v-else 
+                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-warning-100 text-warning-800">
+                <span class="w-2 h-2 bg-warning-500 rounded-full mr-2"></span>
+                Not Connected
+              </span>
+            </div>
+          </div>
+          
+          <!-- Quick Actions Row -->
+          <div class="flex items-center justify-between bg-neutral-50 rounded-lg p-4">
+            <div class="flex items-center space-x-4">
+              <div class="text-sm">
+                <span class="font-medium text-neutral-700">Project Key:</span>
+                <span class="ml-2 font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                  {{ project?.jiraProject?.projectKey || 'Not Set' }}
+                </span>
+              </div>
+              <div v-if="project?.jiraProject?.lastSync" class="text-sm text-neutral-600">
+                <span class="font-medium">Last Sync:</span>
+                {{ formatTimeAgo(project.jiraProject.lastSync) }}
+              </div>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+              <button v-if="project?.jiraProject?.projectKey"
+                      @click="syncJiraProject"
+                      :disabled="isSyncing"
+                      class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                <span v-if="isSyncing" class="mdi mdi-loading mdi-spin text-base mr-1"></span>
+                <span v-else class="mdi mdi-sync text-base mr-1"></span>
+                {{ isSyncing ? 'Syncing...' : 'Sync Now' }}
+              </button>
+              
+              <button @click="openJiraProject"
+                      v-if="project?.jiraProject?.projectKey"
+                      class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-blue-300 text-blue-700 bg-white hover:bg-blue-50">
+                <span class="mdi mdi-open-in-new text-base mr-1"></span>
+                Open in Jira
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Jira Issues Dashboard - Only show if connected -->
+        <div v-if="jiraIntegrationActive">
+          <JiraIssuesDashboard 
+            :project-key="project.jiraIntegration.projectKey"
+            :project-id="projectId"
+            @issue-synced="handleIssueSynced"
+            @issues-updated="handleIssuesUpdated"
+          />
+        </div>
+
+        <!-- No Jira Integration State -->
+        <div v-else class="bg-white rounded-lg shadow-card p-8 text-center">
+          <div class="h-20 w-20 rounded-full bg-blue-100 mx-auto flex items-center justify-center mb-4">
+            <span class="mdi mdi-jira text-4xl text-blue-600"></span>
+          </div>
+          <h3 class="text-lg font-medium text-neutral-900 mb-2">Connect to Jira</h3>
+          <p class="text-neutral-600 mb-6 max-w-md mx-auto">
+            Link this project to a Jira project to view and manage issues directly from here. 
+            You'll be able to track progress, create issues, and sync data between platforms.
+          </p>
+          
+          <!-- Link to Overview tab where JiraProjectLinker is -->
+          <button @click="activeTab = 'overview'"
+                  class="inline-flex items-center px-6 py-3 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
+            <span class="mdi mdi-link-variant text-base mr-2"></span>
+            Set Up Jira Integration
+          </button>
+          
+          <div class="mt-6 text-xs text-neutral-500">
+            <p>Need help? Check out our 
+              <a href="#" class="text-blue-600 hover:text-blue-700 underline">integration guide</a>
             </p>
           </div>
         </div>
