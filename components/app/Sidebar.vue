@@ -36,12 +36,6 @@ const navItems = [
     active: computed(() => router.currentRoute.value.path.startsWith('/projects'))
   },
   { 
-    label: 'My Tasks', 
-    icon: 'mdi-checkbox-marked-outline', 
-    route: '/tasks',
-    active: computed(() => router.currentRoute.value.path.startsWith('/tasks'))
-  },
-  { 
     label: 'Users', 
     icon: 'mdi-account-group-outline', 
     route: '/users',
