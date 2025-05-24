@@ -2682,14 +2682,14 @@ const handleIssuesUpdated = (issuesData) => {
               <div>
                 <h2 class="text-lg font-semibold text-neutral-800">Jira Integration</h2>
                 <p class="text-sm text-neutral-600">
-                  {{ project?.jiraProject?.projectKey ? `Connected to ${project.jiraProject.projectKey}` : 'Manage Jira project integration' }}
+                  Manage Jira project integration
                 </p>
               </div>
             </div>
             
             <!-- Integration Status Badge -->
             <div class="flex items-center space-x-3">
-              <span v-if="project?.jiraProject?.projectKey" 
+              <span v-if="project?.jiraIntegration?.projectKey" 
                     class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">
                 <span class="w-2 h-2 bg-success-500 rounded-full mr-2"></span>
                 Connected
@@ -2708,17 +2708,17 @@ const handleIssuesUpdated = (issuesData) => {
               <div class="text-sm">
                 <span class="font-medium text-neutral-700">Project Key:</span>
                 <span class="ml-2 font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                  {{ project?.jiraProject?.projectKey || 'Not Set' }}
+                  {{ project?.jiraIntegration?.projectKey || 'Not Set' }}
                 </span>
               </div>
-              <div v-if="project?.jiraProject?.lastSync" class="text-sm text-neutral-600">
+              <div v-if="project?.jiraIntegration?.lastSyncDate" class="text-sm text-neutral-600">
                 <span class="font-medium">Last Sync:</span>
-                {{ formatTimeAgo(project.jiraProject.lastSync) }}
+                {{ formatTimeAgo(project.jiraIntegration.lastSyncDate) }}
               </div>
             </div>
             
             <div class="flex items-center space-x-2">
-              <button v-if="project?.jiraProject?.projectKey"
+              <button v-if="project?.jiraIntegration?.projectKey"
                       @click="syncJiraProject"
                       :disabled="isSyncing"
                       class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
@@ -2728,7 +2728,7 @@ const handleIssuesUpdated = (issuesData) => {
               </button>
               
               <button @click="openJiraProject"
-                      v-if="project?.jiraProject?.projectKey"
+                      v-if="project?.jiraIntegration?.projectKey"
                       class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-blue-300 text-blue-700 bg-white hover:bg-blue-50">
                 <span class="mdi mdi-open-in-new text-base mr-1"></span>
                 Open in Jira
