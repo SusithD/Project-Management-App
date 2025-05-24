@@ -119,13 +119,21 @@ const projectStats = computed(() => {
   const assignedProjects = projectsStore.projects.filter(p => p.assignedTo).length;
   const unassignedProjects = total - assignedProjects;
   
+  // JIRA integration stats
+  const jiraLinkedProjects = projectsStore.projects.filter(p => 
+    p.jiraIntegration?.enabled || p.jiraProjectKey
+  ).length;
+  const jiraUnlinkedProjects = total - jiraLinkedProjects;
+  
   return {
     total,
     statusCounts,
     avgProgress,
     upcomingDeadlines,
     assignedProjects,
-    unassignedProjects
+    unassignedProjects,
+    jiraLinkedProjects,
+    jiraUnlinkedProjects
   };
 });
 
@@ -857,7 +865,7 @@ const openNewProjectModal = () => {
 
 // Close new project modal
 const closeNewProjectModal = () => {
-  isNewProjectModalOpen.value = false;
+  isNewProjectModal.value = false;
 };
 
 // Clear all filters
@@ -873,6 +881,110 @@ const clearFilters = () => {
   };
   
   notificationsStore.info('Filters have been cleared', { timeout: 2000 });
+};
+
+// JIRA Integration Controls
+const selectedProjects = ref(new Set());
+const bulkLinkingJira = ref(false);
+
+// Toggle project selection for bulk operations
+const toggleProjectSelection = (projectId) => {
+  if (selectedProjects.value.has(projectId)) {
+    selectedProjects.value.delete(projectId);
+  } else {
+    selectedProjects.value.add(projectId);
+  }
+};
+
+// Select all visible projects
+const selectAllProjects = () => {
+  if (selectedProjects.value.size === sortedProjects.value.length) {
+    selectedProjects.value.clear();
+  } else {
+    sortedProjects.value.forEach(project => {
+      selectedProjects.value.add(project._id || project.id);
+    });
+  }
+};
+
+// Bulk sync selected projects with JIRA
+const bulkSyncWithJira = async () => {
+  const projectsToSync = Array.from(selectedProjects.value).filter(projectId => {
+    const project = projectsStore.projects.find(p => (p._id || p.id) === projectId);
+    return project && (project.jiraIntegration?.enabled || project.jiraProjectKey);
+  });
+
+  if (projectsToSync.length === 0) {
+    notificationsStore.warning('No JIRA-linked projects selected for sync');
+    return;
+  }
+
+  bulkLinkingJira.value = true;
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (const projectId of projectsToSync) {
+    try {
+      const response = await fetch('/api/jira/sync-project', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ projectId })
+      });
+
+      if (response.ok) {
+        successCount++;
+      } else {
+        errorCount++;
+      }
+    } catch (error) {
+      console.error(`Error syncing project ${projectId}:`, error);
+      errorCount++;
+    }
+  }
+
+  bulkLinkingJira.value = false;
+  selectedProjects.value.clear();
+
+  if (successCount > 0) {
+    notificationsStore.success(`Successfully synced ${successCount} project(s) with JIRA`);
+    await projectsStore.fetchProjects(); // Refresh data
+  }
+
+  if (errorCount > 0) {
+    notificationsStore.error(`Failed to sync ${errorCount} project(s)`);
+  }
+};
+
+// Check if project has JIRA integration
+const hasJiraIntegration = (project) => {
+  return !!(project.jiraIntegration?.enabled || project.jiraProjectKey);
+};
+
+// Get JIRA status for project
+const getJiraStatus = (project) => {
+  if (project.jiraIntegration?.enabled) {
+    return {
+      connected: true,
+      projectKey: project.jiraIntegration.projectKey,
+      lastSync: project.jiraIntegration.lastSyncDate,
+      stats: project.jiraIntegration.syncStats
+    };
+  } else if (project.jiraProjectKey) {
+    return {
+      connected: true,
+      projectKey: project.jiraProjectKey,
+      lastSync: null,
+      stats: null
+    };
+  }
+  return {
+    connected: false,
+    projectKey: null,
+    lastSync: null,
+    stats: null
+  };
 };
 </script>
 
@@ -1225,8 +1337,30 @@ const clearFilters = () => {
         </button>
       </div>
       
-      <div class="text-sm text-neutral-500">
-        Showing {{ sortedProjects.length }} of {{ projectsStore.projects.length }} projects
+      <div class="flex items-center gap-4">
+        <!-- JIRA Integration Controls -->
+        <div v-if="selectedProjects.size > 0" class="flex items-center gap-2">
+          <span class="text-sm text-neutral-600">{{ selectedProjects.size }} selected</span>
+          <button
+            @click="bulkSyncWithJira"
+            :disabled="bulkLinkingJira"
+            class="inline-flex items-center px-3 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 hover:bg-blue-200 disabled:opacity-50"
+          >
+            <span v-if="bulkLinkingJira" class="mdi mdi-loading mdi-spin mr-1"></span>
+            <span v-else class="mdi mdi-sync mr-1"></span>
+            Sync with JIRA
+          </button>
+          <button
+            @click="selectedProjects.clear()"
+            class="text-xs text-neutral-500 hover:text-neutral-700"
+          >
+            Clear Selection
+          </button>
+        </div>
+        
+        <div class="text-sm text-neutral-500">
+          Showing {{ sortedProjects.length }} of {{ projectsStore.projects.length }} projects
+        </div>
       </div>
     </div>
     
@@ -1241,289 +1375,196 @@ const clearFilters = () => {
         <table class="min-w-full divide-y divide-neutral-200">
           <thead class="bg-neutral-50">
             <tr>
-              <th scope="col" class="pl-6 pr-3 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                <div class="flex items-center cursor-pointer" @click="toggleSort('name')">
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                <input
+                  type="checkbox"
+                  :checked="selectedProjects.size === sortedProjects.length && sortedProjects.length > 0"
+                  :indeterminate="selectedProjects.size > 0 && selectedProjects.size < sortedProjects.length"
+                  @change="selectAllProjects"
+                  class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded"
+                />
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer" @click="toggleSort('name')">
+                <div class="flex items-center">
                   Project Name
                   <span v-if="sortBy === 'name'" class="ml-1">
-                    <span v-if="sortDirection === 'asc'" class="mdi mdi-chevron-up text-xs"></span>
-                    <span v-else class="mdi mdi-chevron-down text-xs"></span>
+                    <span v-if="sortDirection === 'asc'" class="mdi mdi-arrow-up"></span>
+                    <span v-else class="mdi mdi-arrow-down"></span>
                   </span>
                 </div>
               </th>
-              <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                <div class="flex items-center cursor-pointer" @click="toggleSort('status')">
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer" @click="toggleSort('status')">
+                <div class="flex items-center">
                   Status
                   <span v-if="sortBy === 'status'" class="ml-1">
-                    <span v-if="sortDirection === 'asc'" class="mdi mdi-chevron-up text-xs"></span>
-                    <span v-else class="mdi mdi-chevron-down text-xs"></span>
+                    <span v-if="sortDirection === 'asc'" class="mdi mdi-arrow-up"></span>
+                    <span v-else class="mdi mdi-arrow-down"></span>
                   </span>
                 </div>
               </th>
-              <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                <div class="flex items-center cursor-pointer" @click="toggleSort('progress')">
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer" @click="toggleSort('progress')">
+                <div class="flex items-center">
                   Progress
                   <span v-if="sortBy === 'progress'" class="ml-1">
-                    <span v-if="sortDirection === 'asc'" class="mdi mdi-chevron-up text-xs"></span>
-                    <span v-else class="mdi mdi-chevron-down text-xs"></span>
+                    <span v-if="sortDirection === 'asc'" class="mdi mdi-arrow-up"></span>
+                    <span v-else class="mdi mdi-arrow-down"></span>
                   </span>
                 </div>
               </th>
-              <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider hidden md:table-cell">
-                <div class="flex items-center cursor-pointer" @click="toggleSort('assignee')">
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                JIRA Integration
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer" @click="toggleSort('assignee')">
+                <div class="flex items-center">
                   Assigned To
                   <span v-if="sortBy === 'assignee'" class="ml-1">
-                    <span v-if="sortDirection === 'asc'" class="mdi mdi-chevron-up text-xs"></span>
-                    <span v-else class="mdi mdi-chevron-down text-xs"></span>
+                    <span v-if="sortDirection === 'asc'" class="mdi mdi-arrow-up"></span>
+                    <span v-else class="mdi mdi-arrow-down"></span>
                   </span>
                 </div>
               </th>
-              <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider hidden lg:table-cell">
-                <div class="flex items-center cursor-pointer" @click="toggleSort('startDate')">
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider cursor-pointer" @click="toggleSort('startDate')">
+                <div class="flex items-center">
                   Timeline
                   <span v-if="sortBy === 'startDate'" class="ml-1">
-                    <span v-if="sortDirection === 'asc'" class="mdi mdi-chevron-up text-xs"></span>
-                    <span v-else class="mdi mdi-chevron-down text-xs"></span>
+                    <span v-if="sortDirection === 'asc'" class="mdi mdi-arrow-up"></span>
+                    <span v-else class="mdi mdi-arrow-down"></span>
                   </span>
                 </div>
               </th>
-              <th scope="col" class="px-3 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Actions
+              <th scope="col" class="relative px-6 py-3">
+                <span class="sr-only">Actions</span>
               </th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-neutral-200">
             <template v-for="project in sortedProjects" :key="project.id">
-              <!-- Main Row -->
-              <tr 
-                class="hover:bg-neutral-50 cursor-pointer transition-colors" 
-                :class="{ 'bg-neutral-50': expandedRows.has(project.id) }"
-                @mouseenter="handleProjectHover(project.id)"
-                @mouseleave="handleProjectLeave"
-              >
-                <td class="pl-6 pr-3 py-4">
+              <tr class="hover:bg-neutral-50 transition-colors">
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    :checked="selectedProjects.has(project._id || project.id)"
+                    @change="toggleProjectSelection(project._id || project.id)"
+                    class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded"
+                  />
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
-                    <!-- Expand/Collapse Button -->
-                    <button 
-                      @click="toggleExpandRow(project.id)" 
-                      class="mr-2 text-neutral-400 hover:text-primary-600"
-                    >
-                      <span v-if="expandedRows.has(project.id)" class="mdi mdi-chevron-down"></span>
-                      <span v-else class="mdi mdi-chevron-right"></span>
-                    </button>
-                    
-                    <!-- Project Name with Indicator -->
                     <div>
-                      <div class="flex items-center">
-                        <span class="text-sm font-medium text-neutral-900">{{ project.name }}</span>
-                        <span 
-                          v-if="isApproachingDeadline(project)"
-                          class="ml-2 mdi mdi-clock-alert-outline text-warning-600" 
-                          title="Approaching deadline"
-                        ></span>
+                      <div class="text-sm font-medium text-neutral-900">
+                        <NuxtLink :to="`/projects/${project._id || project.id}`" class="hover:text-primary-600">
+                          {{ project.name }}
+                        </NuxtLink>
                       </div>
-                      <div class="text-xs text-neutral-500 mt-1 truncate max-w-[200px]">
-                        {{ project.remarks || 'No description' }}
-                      </div>
+                      <div v-if="project.category" class="text-sm text-neutral-500">{{ project.category }}</div>
                     </div>
                   </div>
                 </td>
-                <td class="px-3 py-4 whitespace-nowrap">
-                  <span 
-                    :class="[
-                      'px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full',
-                      project.status === 'Completed' ? 'bg-success-100 text-success-800' : 
-                      project.status === 'Ongoing' ? 'bg-accent-100 text-accent-800' : 
-                      'bg-warning-100 text-warning-800'
-                    ]"
-                  >
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span :class="[
+                    'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+                    project.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                    project.status === 'Ongoing' ? 'bg-blue-100 text-blue-800' :
+                    project.status === 'On Hold' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-neutral-100 text-neutral-800'
+                  ]">
                     {{ project.status }}
                   </span>
                 </td>
-                <td class="px-3 py-4 whitespace-nowrap">
+                <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
-                    <div class="w-full bg-neutral-200 rounded-full h-2 mr-2 max-w-[100px]">
+                    <div class="w-full bg-neutral-200 rounded-full h-2 mr-2">
                       <div 
-                        :class="[
-                          'h-2 rounded-full transition-all duration-500',
-                          project.progress >= 80 ? 'bg-success-600' : 
-                          project.progress >= 40 ? 'bg-accent-600' : 'bg-warning-600'
-                        ]"
-                        :style="`width: ${project.progress}%`"
+                        class="bg-primary-600 h-2 rounded-full transition-all duration-300" 
+                        :style="{ width: `${project.progress || 0}%` }"
                       ></div>
                     </div>
-                    <span class="text-xs font-medium text-neutral-700">{{ project.progress }}%</span>
+                    <span class="text-sm text-neutral-600 min-w-0">{{ project.progress || 0 }}%</span>
                   </div>
                 </td>
-                <td class="px-3 py-4 whitespace-nowrap hidden md:table-cell">
-                  <div class="flex items-center">
-                    <span class="inline-block h-8 w-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center mr-2">
-                      {{ getUserName(project.assignedTo).charAt(0) }}
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div v-if="hasJiraIntegration(project)" class="flex items-center">
+                    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                      <span class="mdi mdi-check-circle mr-1"></span>
+                      {{ getJiraStatus(project).projectKey }}
                     </span>
-                    <span class="text-sm text-neutral-700">{{ getUserName(project.assignedTo) }}</span>
+                    <div v-if="getJiraStatus(project).lastSync" class="ml-2 text-xs text-neutral-500">
+                      Synced {{ formatDate(getJiraStatus(project).lastSync) }}
+                    </div>
                   </div>
-                </td>
-                <td class="px-3 py-4 whitespace-nowrap hidden lg:table-cell">
-                  <div class="flex items-center">
-                    <span class="mdi mdi-calendar-range text-neutral-400 mr-1"></span>
-                    <span class="text-sm text-neutral-700">
-                      {{ formatDate(project.startDate) }} - {{ formatDate(project.endDate) }}
+                  <div v-else class="flex items-center">
+                    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-neutral-100 text-neutral-600">
+                      <span class="mdi mdi-link-off mr-1"></span>
+                      Not linked
                     </span>
                   </div>
                 </td>
-                <td class="px-3 py-4 whitespace-nowrap text-right text-sm space-x-1">
-                  <NuxtLink 
-                    :to="`/projects/${project.id}`" 
-                    class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded bg-primary-50 text-primary-700 hover:bg-primary-100"
-                  >
-                    View
-                  </NuxtLink>
-                  <NuxtLink 
-                    :to="`/projects/${project.id}`" 
-                    class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded bg-primary-50 text-primary-700 hover:bg-primary-100"
-                  >
-                    Edit
-                  </NuxtLink>
-                  <button 
-                    @click.stop="deleteProject(project)" 
-                    class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded bg-error-50 text-error-700 hover:bg-error-100"
-                  >
-                    Delete
-                  </button>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
+                  {{ getUserName(project.assignedTo) }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
+                  <div v-if="project.startDate || project.endDate">
+                    <div v-if="project.startDate">Start: {{ formatDate(project.startDate) }}</div>
+                    <div v-if="project.endDate" :class="{ 'text-red-600 font-medium': isApproachingDeadline(project) }">
+                      End: {{ formatDate(project.endDate) }}
+                    </div>
+                  </div>
+                  <div v-else class="text-neutral-400">No timeline set</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <div class="flex items-center justify-end space-x-2">
+                    <NuxtLink 
+                      :to="`/projects/${project._id || project.id}`"
+                      class="text-primary-600 hover:text-primary-900"
+                    >
+                      View
+                    </NuxtLink>
+                    <button 
+                      @click="deleteProject(project)"
+                      class="text-red-600 hover:text-red-900"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
               
-              <!-- Expanded Row with Details -->
-              <tr v-if="expandedRows.has(project.id)">
-                <td colspan="6" class="p-0">
-                  <div class="bg-neutral-50 p-4 pl-12 border-t border-neutral-100">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <!-- Project Details -->
-                      <div class="bg-white p-4 rounded-lg shadow-sm border border-neutral-100">
-                        <h3 class="text-sm font-medium text-neutral-900 mb-3">Project Details</h3>
-                        <ul class="space-y-2">
-                          <li class="flex justify-between text-sm">
-                            <span class="text-neutral-500">Priority:</span>
-                            <span 
-                              :class="[
-                                'font-medium',
-                                project.priority === 'High' ? 'text-error-600' :
-                                project.priority === 'Medium' ? 'text-warning-600' :
-                                'text-success-600'
-                              ]"
-                            >{{ project.priority || 'Not set' }}</span>
-                          </li>
-                          <li class="flex justify-between text-sm">
-                            <span class="text-neutral-500">Category:</span>
-                            <span class="font-medium text-neutral-700">{{ project.category || 'Not set' }}</span>
-                          </li>
-                          <li class="flex justify-between text-sm">
-                            <span class="text-neutral-500">Company:</span>
-                            <span class="font-medium text-neutral-700">{{ project.company || 'Not set' }}</span>
-                          </li>
-                          <li class="flex justify-between text-sm">
-                            <span class="text-neutral-500">Last Updated:</span>
-                            <span class="font-medium text-neutral-700">{{ formatDate(project.lastUpdated) }}</span>
-                          </li>
-                        </ul>
-                      </div>
-                      
-                      <!-- Timeline -->
-                      <div class="bg-white p-4 rounded-lg shadow-sm border border-neutral-100">
-                        <h3 class="text-sm font-medium text-neutral-900 mb-3">Timeline</h3>
-                        <ul class="space-y-2">
-                          <li class="flex justify-between text-sm">
-                            <span class="text-neutral-500">Start Date:</span>
-                            <span class="font-medium text-neutral-700">{{ formatDate(project.startDate) }}</span>
-                          </li>
-                          <li class="flex justify-between text-sm">
-                            <span class="text-neutral-500">End Date:</span>
-                            <span class="font-medium text-neutral-700">{{ formatDate(project.endDate) }}</span>
-                          </li>
-                          <li class="flex justify-between text-sm">
-                            <span class="text-neutral-500">Deadline:</span>
-                            <span 
-                              :class="[
-                                'font-medium',
-                                isApproachingDeadline(project) ? 'text-error-600' : 'text-neutral-700'
-                              ]"
-                            >{{ formatDate(project.deadline) }}</span>
-                          </li>
-                          <li class="flex justify-between text-sm">
-                            <span class="text-neutral-500">Created On:</span>
-                            <span class="font-medium text-neutral-700">{{ formatDate(project.createdAt) }}</span>
-                          </li>
-                        </ul>
-                      </div>
-                      
-                      <!-- Team and External Links -->
-                      <div class="bg-white p-4 rounded-lg shadow-sm border border-neutral-100">
-                        <h3 class="text-sm font-medium text-neutral-900 mb-3">Team & Links</h3>
-                        <ul class="space-y-2">
-                          <li class="flex justify-between text-sm">
-                            <span class="text-neutral-500">Responsible Person:</span>
-                            <span class="font-medium text-neutral-700">
-                              {{ project.responsiblePerson ? getUserName(project.responsiblePerson) : 'Not assigned' }}
-                            </span>
-                          </li>
-                          <li class="flex items-center justify-between text-sm">
-                            <span class="text-neutral-500">Team Size:</span>
-                            <span class="font-medium text-neutral-700">
-                              {{ project.team ? project.team.length : 0 }} members
-                            </span>
-                          </li>
-                          <template v-if="project.externalLinks">
-                            <li v-if="project.externalLinks.githubRepo" class="text-sm flex items-center">
-                              <span class="mdi mdi-github text-lg mr-1 text-neutral-700"></span>
-                              <a 
-                                :href="project.externalLinks.githubRepo" 
-                                target="_blank" 
-                                class="text-primary-600 hover:underline truncate max-w-[150px] inline-block"
-                              >
-                                GitHub Repository
-                              </a>
-                            </li>
-                            <li v-if="project.externalLinks.figmaLink" class="text-sm flex items-center">
-                              <span class="mdi mdi-palette-outline text-lg mr-1 text-neutral-700"></span>
-                              <a 
-                                :href="project.externalLinks.figmaLink" 
-                                target="_blank" 
-                                class="text-primary-600 hover:underline truncate max-w-[150px] inline-block"
-                              >
-                                Figma Designs
-                              </a>
-                            </li>
-                          </template>
-                        </ul>
-                      </div>
+              <!-- Expandable row content -->
+              <tr v-if="expandedRows.has(project.id)" class="bg-neutral-50">
+                <td colspan="8" class="px-6 py-4">
+                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                    <div v-if="project.remarks">
+                      <strong class="text-neutral-700">Remarks:</strong>
+                      <p class="text-neutral-600 mt-1">{{ project.remarks }}</p>
                     </div>
-                    
-                    <div class="mt-4 text-sm text-neutral-500" v-if="project.remarks || project.notes">
-                      <h4 class="font-medium text-neutral-700 mb-1">Description</h4>
-                      <p>{{ project.remarks || project.notes || 'No description available' }}</p>
+                    <div v-if="project.priority">
+                      <strong class="text-neutral-700">Priority:</strong>
+                      <p class="text-neutral-600 mt-1">{{ project.priority }}</p>
                     </div>
-                    
-                    <div class="mt-4 flex justify-center">
-                      <NuxtLink 
-                        :to="`/projects/${project.id}`"
-                        class="text-sm text-primary-600 hover:text-primary-700 flex items-center"
-                      >
-                        View Full Details
-                        <span class="mdi mdi-arrow-right ml-1"></span>
-                      </NuxtLink>
+                    <div v-if="project.company">
+                      <strong class="text-neutral-700">Company:</strong>
+                      <p class="text-neutral-600 mt-1">{{ project.company }}</p>
                     </div>
                   </div>
                 </td>
               </tr>
             </template>
             
-            <!-- No Projects Found -->
+            <!-- Empty state -->
             <tr v-if="sortedProjects.length === 0">
-              <td colspan="6" class="px-6 py-8 text-center text-sm text-neutral-500">
+              <td colspan="8" class="px-6 py-12 text-center">
                 <div class="flex flex-col items-center">
-                  <span class="mdi mdi-folder-search-outline text-4xl text-neutral-400 mb-2"></span>
-                  No projects found matching your filters.
-                  <button @click="clearFilters" class="mt-2 text-primary-600 hover:text-primary-700">
-                    Clear filters
+                  <span class="mdi mdi-folder-outline text-6xl text-neutral-300 mb-4"></span>
+                  <h3 class="text-lg font-medium text-neutral-900 mb-2">No projects found</h3>
+                  <p class="text-neutral-500 mb-4">
+                    {{ projectsStore.projects.length === 0 ? 'Get started by creating your first project.' : 'Try adjusting your filters to see more results.' }}
+                  </p>
+                  <button 
+                    @click="openNewProjectModal"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700"
+                  >
+                    <span class="mdi mdi-plus mr-2"></span>
+                    Create Project
                   </button>
                 </div>
               </td>
@@ -1535,6 +1576,38 @@ const clearFilters = () => {
     
     <!-- Card View -->
     <div v-else-if="viewMode === 'cards'" class="mb-6">
+      <!-- Bulk Selection Controls for Cards -->
+      <div v-if="selectedProjects.size > 0" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <span class="text-sm font-medium text-blue-800">{{ selectedProjects.size }} project(s) selected</span>
+            <button
+              @click="selectAllProjects"
+              class="ml-4 text-sm text-blue-600 hover:text-blue-800"
+            >
+              {{ selectedProjects.size === sortedProjects.length ? 'Deselect All' : 'Select All' }}
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              @click="bulkSyncWithJira"
+              :disabled="bulkLinkingJira"
+              class="inline-flex items-center px-3 py-1 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              <span v-if="bulkLinkingJira" class="mdi mdi-loading mdi-spin mr-1"></span>
+              <span v-else class="mdi mdi-sync mr-1"></span>
+              Sync with JIRA
+            </button>
+            <button
+              @click="selectedProjects.clear()"
+              class="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      </div>
+      
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div 
           v-for="project in sortedProjects" 
@@ -1545,87 +1618,101 @@ const clearFilters = () => {
         >
           <!-- Card Header -->
           <div class="p-4 border-b border-neutral-100">
-            <div class="flex justify-between items-start mb-2">
-              <h3 class="text-lg font-medium text-neutral-900 pr-4">{{ project.name }}</h3>
-              <span 
-                :class="[
-                  'px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full',
-                  project.status === 'Completed' ? 'bg-success-100 text-success-800' : 
-                  project.status === 'Ongoing' ? 'bg-accent-100 text-accent-800' : 
-                  'bg-warning-100 text-warning-800'
-                ]"
-              >
-                {{ project.status }}
-              </span>
-            </div>
-            <div class="flex items-center text-sm text-neutral-500">
-              <span class="mdi mdi-calendar text-neutral-400 mr-1"></span>
-              <span>{{ formatDate(project.startDate) }} - {{ formatDate(project.endDate) }}</span>
-              <span
-                v-if="isApproachingDeadline(project)"
-                class="ml-2 mdi mdi-clock-alert-outline text-warning-600"
-                title="Approaching deadline"
-              ></span>
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <div class="flex items-center mb-2">
+                  <input
+                    type="checkbox"
+                    :checked="selectedProjects.has(project._id || project.id)"
+                    @change="toggleProjectSelection(project._id || project.id)"
+                    class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded mr-3"
+                  />
+                  <h3 class="text-lg font-semibold text-neutral-900 line-clamp-2">
+                    <NuxtLink :to="`/projects/${project._id || project.id}`" class="hover:text-primary-600">
+                      {{ project.name }}
+                    </NuxtLink>
+                  </h3>
+                </div>
+                <div class="flex items-center gap-2 mb-2">
+                  <span :class="[
+                    'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+                    project.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                    project.status === 'Ongoing' ? 'bg-blue-100 text-blue-800' :
+                    project.status === 'On Hold' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-neutral-100 text-neutral-800'
+                  ]">
+                    {{ project.status }}
+                  </span>
+                  <span v-if="project.priority" class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-neutral-100 text-neutral-700">
+                    {{ project.priority }}
+                  </span>
+                </div>
+                
+                <!-- JIRA Integration Status in Cards -->
+                <div class="flex items-center mb-2">
+                  <div v-if="hasJiraIntegration(project)" class="flex items-center">
+                    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                      <span class="mdi mdi-check-circle mr-1"></span>
+                      JIRA: {{ getJiraStatus(project).projectKey }}
+                    </span>
+                  </div>
+                  <div v-else>
+                    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-neutral-100 text-neutral-600">
+                      <span class="mdi mdi-link-off mr-1"></span>
+                      No JIRA link
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-2xl font-bold text-primary-600">{{ project.progress || 0 }}%</div>
+                <div class="text-xs text-neutral-500">Progress</div>
+              </div>
             </div>
           </div>
           
           <!-- Card Body -->
           <div class="p-4">
-            <div class="mb-4">
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-sm font-medium text-neutral-700">Progress</span>
-                <span class="text-sm font-medium text-neutral-700">{{ project.progress }}%</span>
+            <div class="space-y-3">
+              <div v-if="project.assignedTo" class="flex items-center text-sm text-neutral-600">
+                <span class="mdi mdi-account mr-2"></span>
+                <span>{{ getUserName(project.assignedTo) }}</span>
               </div>
-              <div class="w-full bg-neutral-200 rounded-full h-2">
-                <div 
-                  :class="[
-                    'h-2 rounded-full transition-all duration-500',
-                    project.progress >= 80 ? 'bg-success-600' : 
-                    project.progress >= 40 ? 'bg-accent-600' : 'bg-warning-600'
-                  ]"
-                  :style="`width: ${project.progress}%`"
-                ></div>
+              
+              <div v-if="project.startDate || project.endDate" class="flex items-center text-sm text-neutral-600">
+                <span class="mdi mdi-calendar mr-2"></span>
+                <span v-if="project.startDate && project.endDate">
+                  {{ formatDate(project.startDate) }} - {{ formatDate(project.endDate) }}
+                </span>
+                <span v-else-if="project.startDate">
+                  Started {{ formatDate(project.startDate) }}
+                </span>
+                <span v-else>
+                  Due {{ formatDate(project.endDate) }}
+                </span>
+              </div>
+              
+              <div v-if="project.category" class="flex items-center text-sm text-neutral-600">
+                <span class="mdi mdi-tag mr-2"></span>
+                <span>{{ project.category }}</span>
+              </div>
+              
+              <div v-if="project.remarks" class="text-sm text-neutral-600 line-clamp-2">
+                {{ project.remarks }}
               </div>
             </div>
             
-            <!-- Project details -->
-            <div class="space-y-3">
-              <!-- Team -->
-              <div class="flex items-center">
-                <span class="inline-block h-8 w-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center mr-2">
-                  {{ getUserName(project.assignedTo).charAt(0) }}
-                </span>
-                <div>
-                  <div class="text-xs text-neutral-500">Team Lead</div>
-                  <div class="text-sm text-neutral-900">{{ getUserName(project.assignedTo) }}</div>
-                </div>
+            <!-- Progress Bar -->
+            <div class="mt-4">
+              <div class="flex justify-between text-sm text-neutral-600 mb-1">
+                <span>Progress</span>
+                <span>{{ project.progress || 0 }}%</span>
               </div>
-              
-              <!-- Category and Priority -->
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <div class="text-xs text-neutral-500">Category</div>
-                  <div class="text-sm text-neutral-900">{{ project.category || 'Not set' }}</div>
-                </div>
-                <div>
-                  <div class="text-xs text-neutral-500">Priority</div>
-                  <div 
-                    :class="[
-                      'text-sm font-medium',
-                      project.priority === 'High' ? 'text-error-600' : 
-                      project.priority === 'Medium' ? 'text-warning-600' : 
-                      'text-success-600'
-                    ]"
-                  >
-                    {{ project.priority || 'Not set' }}
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Description -->
-              <div v-if="project.remarks">
-                <div class="text-xs text-neutral-500">Description</div>
-                <div class="text-sm text-neutral-700 line-clamp-2">{{ project.remarks }}</div>
+              <div class="w-full bg-neutral-200 rounded-full h-2">
+                <div 
+                  class="bg-primary-600 h-2 rounded-full transition-all duration-300" 
+                  :style="{ width: `${project.progress || 0}%` }"
+                ></div>
               </div>
             </div>
           </div>
@@ -1633,28 +1720,15 @@ const clearFilters = () => {
           <!-- Card Footer -->
           <div class="bg-neutral-50 px-4 py-3 flex justify-between items-center">
             <div class="text-xs text-neutral-500">
-              Last updated: {{ formatDate(project.lastUpdated) }}
+              Updated {{ formatDate(project.lastUpdated) }}
             </div>
-            
-            <div class="flex gap-1">
+            <div class="flex items-center space-x-2">
               <NuxtLink 
-                :to="`/projects/${project.id}`" 
-                class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded bg-primary-50 text-primary-700 hover:bg-primary-100"
+                :to="`/projects/${project._id || project.id}`"
+                class="text-primary-600 hover:text-primary-900 text-sm font-medium"
               >
-                View
+                View Details
               </NuxtLink>
-              <NuxtLink 
-                :to="`/projects/${project.id}`" 
-                class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded bg-primary-50 text-primary-700 hover:bg-primary-100"
-              >
-                Edit
-              </NuxtLink>
-              <button 
-                @click="deleteProject(project)" 
-                class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded bg-error-50 text-error-700 hover:bg-error-100"
-              >
-                Delete
-              </button>
             </div>
           </div>
         </div>
@@ -1662,14 +1736,17 @@ const clearFilters = () => {
         <!-- Empty state when no projects match filters -->
         <div v-if="sortedProjects.length === 0" class="col-span-full flex flex-col items-center justify-center py-12 bg-white rounded-lg">
           <div class="flex flex-col items-center">
-            <span class="mdi mdi-folder-search-outline text-5xl text-neutral-300 mb-4"></span>
-            <h3 class="text-lg font-medium text-neutral-700 mb-1">No projects found</h3>
-            <p class="text-neutral-500 mb-4">Try changing your filter criteria</p>
+            <span class="mdi mdi-folder-outline text-6xl text-neutral-300 mb-4"></span>
+            <h3 class="text-lg font-medium text-neutral-900 mb-2">No projects found</h3>
+            <p class="text-neutral-500 mb-4 text-center">
+              {{ projectsStore.projects.length === 0 ? 'Get started by creating your first project.' : 'Try adjusting your filters to see more results.' }}
+            </p>
             <button 
-              @click="clearFilters" 
-              class="px-4 py-2 border border-transparent text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 shadow-sm"
+              @click="openNewProjectModal"
+              class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700"
             >
-              Clear All Filters
+              <span class="mdi mdi-plus mr-2"></span>
+              Create Project
             </button>
           </div>
         </div>
@@ -1680,19 +1757,13 @@ const clearFilters = () => {
           @click="openNewProjectModal"
         >
           <div class="flex flex-col items-center text-center p-4">
-            <span class="mdi mdi-plus-circle-outline text-4xl text-primary-500 mb-2"></span>
-            <h3 class="text-lg font-medium text-neutral-700 mb-1">Add New Project</h3>
-            <p class="text-sm text-neutral-500">Click to create a new project</p>
+            <span class="mdi mdi-plus-circle text-4xl text-neutral-400 mb-2"></span>
+            <span class="text-neutral-600 font-medium">Add New Project</span>
+            <span class="text-neutral-500 text-sm">Create a new project to get started</span>
           </div>
         </div>
       </div>
     </div>
-    
-    <!-- New Project Modal -->
-    <NewProjectModal 
-      :is-open="isNewProjectModalOpen" 
-      @close="closeNewProjectModal"
-    />
   </div>
 </template>
 
@@ -1726,6 +1797,7 @@ const clearFilters = () => {
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;  
   overflow: hidden;
 }
