@@ -44,6 +44,10 @@ export default defineNuxtConfig({
     // Public environment variables
     public: {
       appUrl: process.env.APP_URL || 'http://localhost:3000',
+      // Add Jira base URL to public config for client-side access
+      jira: {
+        baseUrl: process.env.JIRA_BASE_URL || ''
+      },
       msalConfig: {
         auth: {
           clientId: process.env.AZURE_AD_CLIENT_ID || 'your-client-id',
