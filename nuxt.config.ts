@@ -33,6 +33,14 @@ export default defineNuxtConfig({
       uri: process.env.MONGO_URI || 'mongodb://localhost:27017',
       dbName: process.env.MONGO_DB || 'project_management'
     },
+    // JIRA configuration
+    jira: {
+      baseUrl: process.env.JIRA_BASE_URL || '',
+      email: process.env.JIRA_EMAIL || '',
+      apiToken: process.env.JIRA_API_TOKEN || '',
+      projectKey: process.env.JIRA_PROJECT_KEY || '',
+      enabled: process.env.JIRA_ENABLED === 'true'
+    },
     // Public environment variables
     public: {
       appUrl: process.env.APP_URL || 'http://localhost:3000',
