@@ -7,18 +7,57 @@
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <p class="mt-3 text-neutral-700 font-medium">Loading tasks...</p>
+        <p class="mt-3 text-neutral-700 font-medium">Loading your tasks from JIRA...</p>
       </div>
     </div>
 
-    <!-- Header with search and action buttons -->
+    <!-- Header with enhanced info -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
       <div class="flex flex-col w-full md:w-auto mb-4 md:mb-0">
-        <h1 class="text-3xl font-bold text-neutral-900 mb-2">My Tasks</h1>
-        <p class="text-neutral-600">View and manage your assigned tasks</p>
+        <h1 class="text-3xl font-bold text-neutral-900 mb-2 flex items-center">
+          <span class="mdi mdi-account-check text-primary-600 mr-3"></span>
+          My Tasks
+        </h1>
+        <p class="text-neutral-600">Tasks assigned to you across all JIRA projects</p>
+        <div v-if="userTasksData?.stats" class="flex items-center mt-2 text-sm text-neutral-500">
+          <span class="mdi mdi-information mr-1"></span>
+          {{ userTasksData.stats.jiraIntegratedProjects }} JIRA projects • Last updated: {{ formatDate(new Date()) }}
+        </div>
       </div>
       
       <div class="flex flex-col sm:flex-row w-full md:w-auto gap-4">
+        <!-- View Mode Toggle -->
+        <div class="flex bg-neutral-100 rounded-lg p-1">
+          <button
+            @click="viewMode = 'projects'"
+            :class="[
+              'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+              viewMode === 'projects' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'
+            ]"
+          >
+            <span class="mdi mdi-folder-multiple mr-1"></span>By Projects
+          </button>
+          <button
+            @click="viewMode = 'list'"
+            :class="[
+              'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+              viewMode === 'list' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'
+            ]"
+          >
+            <span class="mdi mdi-view-list mr-1"></span>All Tasks
+          </button>
+          <button
+            @click="viewMode = 'kanban'"
+            :class="[
+              'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+              viewMode === 'kanban' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'
+            ]"
+          >
+            <span class="mdi mdi-view-column mr-1"></span>Kanban
+          </button>
+        </div>
+
+        <!-- Search -->
         <div class="relative">
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <span class="mdi mdi-magnify text-gray-400"></span>
@@ -31,535 +70,909 @@
           />
         </div>
 
+        <!-- Refresh Button -->
         <button 
-          class="inline-flex items-center justify-center px-5 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-primary-600 hover:bg-primary-700 transition-colors duration-300"
+          @click="fetchUserTasks"
+          :disabled="loading"
+          class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300"
         >
-          <span class="mdi mdi-filter-variant text-lg mr-2"></span>
-          Filter
+          <span :class="['mdi mr-2', loading ? 'mdi-loading mdi-spin' : 'mdi-refresh']"></span>
+          {{ loading ? 'Loading...' : 'Refresh' }}
         </button>
       </div>
     </div>
 
-    <!-- Stats Cards Row -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Enhanced Stats Cards Row -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
       <!-- Total Tasks -->
-      <div class="bg-white p-5 rounded-xl shadow-card hover:shadow-lg transition-shadow duration-300 transform hover:-translate-y-1">
-        <div class="flex items-center mb-3">
-          <div class="w-12 h-12 rounded-lg bg-primary-100 flex items-center justify-center text-primary-600">
+      <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-5 rounded-xl shadow-card hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 border border-blue-200">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center text-white">
             <span class="mdi mdi-checkbox-marked-outline text-2xl"></span>
           </div>
-          <h3 class="ml-4 text-lg font-medium text-neutral-700">Total Tasks</h3>
+          <span class="text-2xl font-bold text-blue-900">{{ userTasksData?.stats?.totalTasks || 0 }}</span>
         </div>
-        <p class="text-4xl font-bold text-neutral-900">{{ totalTasks }}</p>
+        <h3 class="text-sm font-medium text-blue-800">Total Tasks</h3>
+        <div class="mt-2 h-1.5 bg-blue-200 rounded-full">
+          <div class="h-1.5 bg-blue-600 rounded-full" style="width: 100%"></div>
+        </div>
       </div>
       
       <!-- In Progress -->
-      <div class="bg-white p-5 rounded-xl shadow-card hover:shadow-lg transition-shadow duration-300 transform hover:-translate-y-1">
-        <div class="flex items-center mb-3">
-          <div class="w-12 h-12 rounded-lg bg-accent-100 flex items-center justify-center text-accent-600">
+      <div class="bg-gradient-to-r from-orange-50 to-orange-100 p-5 rounded-xl shadow-card hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 border border-orange-200">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 rounded-lg bg-orange-600 flex items-center justify-center text-white">
             <span class="mdi mdi-clock-outline text-2xl"></span>
           </div>
-          <h3 class="ml-4 text-lg font-medium text-neutral-700">In Progress</h3>
+          <span class="text-2xl font-bold text-orange-900">{{ userTasksData?.stats?.inProgressTasks || 0 }}</span>
         </div>
-        <p class="text-4xl font-bold text-neutral-900">{{ inProgressTasks }}</p>
+        <h3 class="text-sm font-medium text-orange-800">In Progress</h3>
+        <div class="mt-2 h-1.5 bg-orange-200 rounded-full">
+          <div 
+            class="h-1.5 bg-orange-600 rounded-full transition-all duration-500" 
+            :style="{ width: `${getProgressWidth('inProgress')}%` }"
+          ></div>
+        </div>
       </div>
       
       <!-- Completed -->
-      <div class="bg-white p-5 rounded-xl shadow-card hover:shadow-lg transition-shadow duration-300 transform hover:-translate-y-1">
-        <div class="flex items-center mb-3">
-          <div class="w-12 h-12 rounded-lg bg-success-100 flex items-center justify-center text-success-600">
+      <div class="bg-gradient-to-r from-success-50 to-success-100 p-5 rounded-xl shadow-card hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 border border-success-200">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 rounded-lg bg-success-600 flex items-center justify-center text-white">
             <span class="mdi mdi-check-circle-outline text-2xl"></span>
           </div>
-          <h3 class="ml-4 text-lg font-medium text-neutral-700">Completed</h3>
+          <span class="text-2xl font-bold text-success-900">{{ userTasksData?.stats?.completedTasks || 0 }}</span>
         </div>
-        <p class="text-4xl font-bold text-neutral-900">{{ completedTasks }}</p>
+        <h3 class="text-sm font-medium text-success-800">Completed</h3>
+        <div class="mt-2 h-1.5 bg-success-200 rounded-full">
+          <div 
+            class="h-1.5 bg-success-600 rounded-full transition-all duration-500" 
+            :style="{ width: `${getProgressWidth('completed')}%` }"
+          ></div>
+        </div>
       </div>
       
       <!-- Overdue -->
-      <div class="bg-white p-5 rounded-xl shadow-card hover:shadow-lg transition-shadow duration-300 transform hover:-translate-y-1">
-        <div class="flex items-center mb-3">
-          <div class="w-12 h-12 rounded-lg bg-warning-100 flex items-center justify-center text-warning-600">
+      <div class="bg-gradient-to-r from-error-50 to-error-100 p-5 rounded-xl shadow-card hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 border border-error-200">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 rounded-lg bg-error-600 flex items-center justify-center text-white">
             <span class="mdi mdi-alert-circle-outline text-2xl"></span>
           </div>
-          <h3 class="ml-4 text-lg font-medium text-neutral-700">Overdue</h3>
+          <span class="text-2xl font-bold text-error-900">{{ userTasksData?.stats?.overdueTasks || 0 }}</span>
         </div>
-        <p class="text-4xl font-bold text-neutral-900">{{ overdueTasks }}</p>
-      </div>
-    </div>
-
-    <!-- Project Filter Dropdown -->
-    <div class="flex items-center mb-6">
-      <span class="text-neutral-700 mr-3">Filter by Project:</span>
-      <select 
-        v-model="selectedProject" 
-        class="border border-gray-300 rounded-md py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-        @change="filterTasksByProject"
-      >
-        <option value="all">All Projects</option>
-        <option v-for="project in userProjects" :key="project._id" :value="project._id">
-          {{ project.name }}
-        </option>
-      </select>
-    </div>
-
-    <!-- Tasks List Section -->
-    <div class="bg-white rounded-xl shadow-card mb-8">
-      <div class="border-b border-neutral-200 p-5">
-        <h2 class="text-xl font-semibold text-neutral-800">Task List</h2>
-      </div>
-
-      <!-- Tabs Navigation -->
-      <div class="border-b border-neutral-200 px-5">
-        <div class="flex">
-          <button 
-            @click="selectedTab = 'all'" 
-            :class="[
-              'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-200',
-              selectedTab === 'all' 
-                ? 'border-primary-600 text-primary-600' 
-                : 'border-transparent text-neutral-500 hover:text-neutral-700'
-            ]"
-          >
-            All Tasks
-          </button>
-          <button 
-            @click="selectedTab = 'active'" 
-            :class="[
-              'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-200',
-              selectedTab === 'active' 
-                ? 'border-primary-600 text-primary-600' 
-                : 'border-transparent text-neutral-500 hover:text-neutral-700'
-            ]"
-          >
-            Active
-          </button>
-          <button 
-            @click="selectedTab = 'completed'" 
-            :class="[
-              'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-200',
-              selectedTab === 'completed' 
-                ? 'border-primary-600 text-primary-600' 
-                : 'border-transparent text-neutral-500 hover:text-neutral-700'
-            ]"
-          >
-            Completed
-          </button>
-          <button 
-            @click="selectedTab = 'overdue'" 
-            :class="[
-              'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-200',
-              selectedTab === 'overdue' 
-                ? 'border-primary-600 text-primary-600' 
-                : 'border-transparent text-neutral-500 hover:text-neutral-700'
-            ]"
-          >
-            Overdue
-          </button>
+        <h3 class="text-sm font-medium text-error-800">Overdue</h3>
+        <div class="mt-2 h-1.5 bg-error-200 rounded-full">
+          <div 
+            class="h-1.5 bg-error-600 rounded-full transition-all duration-500" 
+            :style="{ width: `${getProgressWidth('overdue')}%` }"
+          ></div>
         </div>
       </div>
 
-      <!-- Tasks Table -->
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-neutral-200">
-          <thead class="bg-neutral-50">
-            <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Task</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Project</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Due Date</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Status</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Priority</th>
-              <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-neutral-200">
-            <tr v-if="filteredTasks.length === 0 && !loading">
-              <td colspan="6" class="px-6 py-10 text-center text-neutral-500">
-                <div class="flex flex-col items-center">
-                  <span class="mdi mdi-clipboard-text-outline text-5xl text-neutral-300 mb-2"></span>
-                  <p class="text-lg font-medium">No tasks found</p>
-                  <p class="text-sm mt-1">{{ searchQuery ? 'Try a different search term' : 'You have no tasks assigned currently' }}</p>
+      <!-- Projects -->
+      <div class="bg-gradient-to-r from-purple-50 to-purple-100 p-5 rounded-xl shadow-card hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 border border-purple-200">
+        <div class="flex items-center justify-between mb-3">
+          <div class="w-12 h-12 rounded-lg bg-purple-600 flex items-center justify-center text-white">
+            <span class="mdi mdi-folder-multiple text-2xl"></span>
+          </div>
+          <span class="text-2xl font-bold text-purple-900">{{ userTasksData?.stats?.jiraIntegratedProjects || 0 }}</span>
+        </div>
+        <h3 class="text-sm font-medium text-purple-800">JIRA Projects</h3>
+        <div class="mt-2 h-1.5 bg-purple-200 rounded-full">
+          <div class="h-1.5 bg-purple-600 rounded-full" style="width: 100%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content based on view mode -->
+    <div v-if="userTasksData?.projects?.length > 0">
+      <!-- Projects View -->
+      <div v-if="viewMode === 'projects'" class="space-y-6">
+        <div
+          v-for="project in filteredProjects"
+          :key="project.projectId"
+          class="bg-white rounded-xl shadow-card border border-neutral-200 overflow-hidden"
+        >
+          <!-- Project Header -->
+          <div class="bg-gradient-to-r from-neutral-50 to-neutral-100 px-6 py-4 border-b border-neutral-200">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <div class="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center mr-4">
+                  <span v-if="project.isJiraIntegrated" class="mdi mdi-jira text-primary-600 text-xl"></span>
+                  <span v-else class="mdi mdi-folder text-primary-600 text-xl"></span>
                 </div>
-              </td>
-            </tr>
-            <tr v-for="task in filteredTasks" :key="task.id" class="hover:bg-neutral-50">
-              <td class="px-6 py-4">
-                <div class="flex items-start">
-                  <div class="flex-shrink-0">
-                    <input 
-                      type="checkbox" 
-                      :checked="task.status === 'Completed'"
-                      @change="toggleTaskStatus(task)"
-                      class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    />
+                <div>
+                  <h3 class="text-lg font-semibold text-neutral-900 flex items-center">
+                    {{ project.projectName }}
+                    <span v-if="project.projectKey" class="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded">
+                      {{ project.projectKey }}
+                    </span>
+                  </h3>
+                  <p class="text-sm text-neutral-600">
+                    {{ project.tasks.length }} task{{ project.tasks.length !== 1 ? 's' : '' }} assigned to you
+                    <span v-if="project.isJiraIntegrated" class="ml-2 text-blue-600">• JIRA Integrated</span>
+                  </p>
+                </div>
+              </div>
+              
+              <div class="flex items-center space-x-3">
+                <!-- Project task stats -->
+                <div class="flex items-center space-x-4 text-sm">
+                  <div class="flex items-center text-orange-600">
+                    <span class="w-2 h-2 bg-orange-500 rounded-full mr-1"></span>
+                    {{ getProjectTasksByStatus(project, 'In Progress').length }}
                   </div>
-                  <div class="ml-3">
-                    <div :class="[
-                      'text-sm font-medium',
-                      task.status === 'Completed' ? 'text-neutral-500 line-through' : 'text-neutral-900'
-                    ]">
-                      {{ task.title }}
+                  <div class="flex items-center text-success-600">
+                    <span class="w-2 h-2 bg-success-500 rounded-full mr-1"></span>
+                    {{ getProjectTasksByStatus(project, 'Done').length }}
+                  </div>
+                  <div class="flex items-center text-error-600">
+                    <span class="w-2 h-2 bg-error-500 rounded-full mr-1"></span>
+                    {{ getProjectOverdueTasks(project).length }}
+                  </div>
+                </div>
+                
+                <!-- Expand/Collapse -->
+                <button
+                  @click="toggleProjectExpansion(project.projectId)"
+                  class="p-2 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-200 rounded-md transition-colors"
+                >
+                  <span :class="[
+                    'mdi text-lg transition-transform duration-200',
+                    expandedProjects.includes(project.projectId) ? 'mdi-chevron-up' : 'mdi-chevron-down'
+                  ]"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Project Tasks -->
+          <div v-show="expandedProjects.includes(project.projectId)" class="p-6">
+            <div v-if="project.tasks.length === 0" class="text-center py-8 text-neutral-500">
+              <span class="mdi mdi-clipboard-text-outline text-4xl block mb-2"></span>
+              <p>No tasks assigned in this project</p>
+            </div>
+            
+            <div v-else class="space-y-3">
+              <div
+                v-for="task in project.tasks"
+                :key="task.id"
+                class="flex items-center p-4 bg-neutral-50 rounded-lg border border-neutral-200 hover:bg-neutral-100 transition-colors group"
+              >
+                <!-- Task Icon & Checkbox -->
+                <div class="flex items-center mr-4">
+                  <input 
+                    type="checkbox" 
+                    :checked="isTaskCompleted(task)"
+                    @change="toggleTaskStatus(task)"
+                    class="h-5 w-5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                </div>
+
+                <!-- Task Content -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <!-- Task Title & Issue Key -->
+                      <div class="flex items-center mb-1">
+                        <h4 :class="[
+                          'font-medium mr-3',
+                          isTaskCompleted(task) ? 'text-neutral-500 line-through' : 'text-neutral-900'
+                        ]">
+                          {{ task.title }}
+                        </h4>
+                        <span v-if="task.issueKey" class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded">
+                          {{ task.issueKey }}
+                        </span>
+                        <span v-if="task.issueType" class="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
+                          {{ task.issueType }}
+                        </span>
+                      </div>
+                      
+                      <!-- Description -->
+                      <p v-if="task.description" class="text-sm text-neutral-600 mb-2 line-clamp-2">
+                        {{ stripHtml(task.description) }}
+                      </p>
+                      
+                      <!-- Task Meta -->
+                      <div class="flex items-center text-xs text-neutral-500 space-x-4">
+                        <div v-if="task.dueDate" class="flex items-center">
+                          <span class="mdi mdi-calendar mr-1"></span>
+                          <span :class="{ 'text-error-600 font-medium': isTaskOverdue(task) }">
+                            Due {{ formatDate(task.dueDate) }}
+                            <span v-if="isTaskOverdue(task)" class="ml-1">(Overdue)</span>
+                          </span>
+                        </div>
+                        <div class="flex items-center">
+                          <span class="mdi mdi-clock-outline mr-1"></span>
+                          Updated {{ formatRelativeDate(task.updated) }}
+                        </div>
+                        <div v-if="task.components?.length" class="flex items-center">
+                          <span class="mdi mdi-tag mr-1"></span>
+                          {{ task.components.join(', ') }}
+                        </div>
+                      </div>
                     </div>
-                    <div class="text-sm text-neutral-500 mt-1">{{ task.description }}</div>
+
+                    <!-- Task Status & Priority -->
+                    <div class="flex items-center space-x-2 ml-4">
+                      <span :class="getStatusBadgeClass(task.status)" class="px-2 py-1 text-xs font-medium rounded-full">
+                        {{ task.status }}
+                      </span>
+                      <span :class="getPriorityBadgeClass(task.priority)" class="px-2 py-1 text-xs font-medium rounded-full">
+                        {{ task.priority }}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-neutral-900">{{ getProjectName(task.projectId) }}</div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div :class="[
-                  'text-sm',
-                  isOverdue(task) ? 'text-red-600 font-medium' : 'text-neutral-900'
-                ]">
-                  {{ formatDate(task.dueDate) }}
-                  <span v-if="isOverdue(task)" class="text-xs font-medium ml-1 text-red-600">
-                    (Overdue)
-                  </span>
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span 
-                  :class="[
-                    'px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full', 
-                    getStatusBadgeClass(task.status)
-                  ]"
-                >
-                  {{ task.status }}
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span 
-                  :class="[
-                    'px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full', 
-                    getPriorityBadgeClass(task.priority)
-                  ]"
-                >
-                  {{ task.priority }}
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <div class="flex justify-end space-x-2">
-                  <button 
-                    @click="viewTaskDetails(task)" 
-                    class="text-primary-600 hover:text-primary-800 transition-colors"
+
+                <!-- Task Actions -->
+                <div class="flex items-center space-x-2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    v-if="task.jiraUrl"
+                    @click="openInJira(task.jiraUrl)"
+                    class="p-2 text-neutral-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                    title="Open in JIRA"
+                  >
+                    <span class="mdi mdi-open-in-new text-base"></span>
+                  </button>
+                  <button
+                    @click="viewTaskDetails(task)"
+                    class="p-2 text-neutral-600 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors"
                     title="View Details"
                   >
-                    <span class="mdi mdi-eye text-lg"></span>
-                  </button>
-                  <button 
-                    class="text-neutral-600 hover:text-neutral-800 transition-colors"
-                    title="Edit Task"
-                  >
-                    <span class="mdi mdi-pencil text-lg"></span>
+                    <span class="mdi mdi-eye text-base"></span>
                   </button>
                 </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Empty list placeholder - shown when there are no tasks -->
-      <div v-if="!loading && tasks.length === 0" class="py-12 px-6 text-center">
-        <div class="flex flex-col items-center">
-          <div class="mb-4 bg-neutral-100 rounded-full p-6 w-20 h-20 flex items-center justify-center">
-            <span class="mdi mdi-clipboard-check-outline text-4xl text-neutral-500"></span>
-          </div>
-          <h3 class="text-lg font-medium text-neutral-900 mb-1">No tasks yet</h3>
-          <p class="text-neutral-500 max-w-sm mx-auto">
-            You don't have any tasks assigned to you yet. Tasks will appear here when they are assigned.
-          </p>
+      <!-- All Tasks List View -->
+      <div v-else-if="viewMode === 'list'" class="bg-white rounded-xl shadow-card">
+        <div class="border-b border-neutral-200 p-6">
+          <h2 class="text-xl font-semibold text-neutral-800">All Tasks</h2>
+          <p class="text-sm text-neutral-600 mt-1">{{ allTasks.length }} tasks from {{ userTasksData.projects.length }} projects</p>
         </div>
+
+        <!-- Tabs Navigation -->
+        <div class="border-b border-neutral-200 px-6">
+          <div class="flex">
+            <button 
+              @click="selectedTab = 'all'" 
+              :class="[
+                'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-200',
+                selectedTab === 'all' 
+                  ? 'border-primary-600 text-primary-600' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700'
+              ]"
+            >
+              All Tasks
+            </button>
+            <button 
+              @click="selectedTab = 'active'" 
+              :class="[
+                'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-200',
+                selectedTab === 'active' 
+                  ? 'border-primary-600 text-primary-600' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700'
+              ]"
+            >
+              Active
+            </button>
+            <button 
+              @click="selectedTab = 'completed'" 
+              :class="[
+                'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-200',
+                selectedTab === 'completed' 
+                  ? 'border-primary-600 text-primary-600' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700'
+              ]"
+            >
+              Completed
+            </button>
+            <button 
+              @click="selectedTab = 'overdue'" 
+              :class="[
+                'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-200',
+                selectedTab === 'overdue' 
+                  ? 'border-primary-600 text-primary-600' 
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700'
+              ]"
+            >
+              Overdue
+            </button>
+          </div>
+        </div>
+
+        <!-- Enhanced Tasks Table -->
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-neutral-200">
+            <thead class="bg-neutral-50">
+              <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Task</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Project</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Issue Key</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Due Date</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Status</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">Priority</th>
+                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-neutral-200">
+              <tr v-if="allTasks.length === 0">
+                <td colspan="7" class="px-6 py-10 text-center text-neutral-500">
+                  <div class="flex flex-col items-center">
+                    <span class="mdi mdi-clipboard-text-outline text-5xl text-neutral-300 mb-2"></span>
+                    <p class="text-lg font-medium">No tasks found</p>
+                    <p class="text-sm mt-1">{{ searchQuery ? 'Try a different search term' : 'You have no tasks assigned currently' }}</p>
+                  </div>
+                </td>
+              </tr>
+              <tr v-for="task in allTasks" :key="task.id" class="hover:bg-neutral-50">
+                <td class="px-6 py-4">
+                  <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                      <input 
+                        type="checkbox" 
+                        :checked="isTaskCompleted(task)"
+                        @change="toggleTaskStatus(task)"
+                        class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                    </div>
+                    <div class="ml-3">
+                      <div :class="[
+                        'text-sm font-medium',
+                        isTaskCompleted(task) ? 'text-neutral-500 line-through' : 'text-neutral-900'
+                      ]">
+                        {{ task.title }}
+                      </div>
+                      <div v-if="task.description" class="text-sm text-neutral-500 mt-1 line-clamp-1">
+                        {{ stripHtml(task.description) }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="text-sm text-neutral-900">{{ getProjectName(task.projectId) }}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span v-if="task.issueKey" class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-mono rounded">
+                    {{ task.issueKey }}
+                  </span>
+                  <span v-else class="text-neutral-400 text-xs">-</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div v-if="task.dueDate" :class="[
+                    'text-sm',
+                    isTaskOverdue(task) ? 'text-error-600 font-medium' : 'text-neutral-900'
+                  ]">
+                    {{ formatDate(task.dueDate) }}
+                    <span v-if="isTaskOverdue(task)" class="text-xs font-medium ml-1 text-error-600">
+                      (Overdue)
+                    </span>
+                  </div>
+                  <span v-else class="text-neutral-400 text-sm">No due date</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span :class="getStatusBadgeClass(task.status)" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                    {{ task.status }}
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span :class="getPriorityBadgeClass(task.priority)" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full">
+                    {{ task.priority }}
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <div class="flex justify-end space-x-2">
+                    <button
+                      v-if="task.jiraUrl"
+                      @click="openInJira(task.jiraUrl)"
+                      class="text-blue-600 hover:text-blue-800 transition-colors"
+                      title="Open in JIRA"
+                    >
+                      <span class="mdi mdi-open-in-new text-lg"></span>
+                    </button>
+                    <button 
+                      @click="viewTaskDetails(task)" 
+                      class="text-primary-600 hover:text-primary-800 transition-colors"
+                      title="View Details"
+                    >
+                      <span class="mdi mdi-eye text-lg"></span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Kanban View -->
+      <div v-else-if="viewMode === 'kanban'" class="overflow-x-auto">
+        <div class="flex space-x-6 min-w-max pb-4">
+          <!-- To Do Column -->
+          <div class="w-80 bg-neutral-50 rounded-lg border border-neutral-200">
+            <div class="p-4 border-b border-neutral-200 bg-neutral-100">
+              <h3 class="font-semibold text-neutral-800 flex items-center justify-between">
+                <span class="flex items-center">
+                  <span class="mdi mdi-clock-outline mr-2 text-neutral-600"></span>
+                  To Do
+                </span>
+                <span class="bg-neutral-200 text-neutral-700 text-xs px-2 py-1 rounded-full">
+                  {{ kanbanColumns.todo.length }}
+                </span>
+              </h3>
+            </div>
+            <div class="p-4 space-y-3 max-h-96 overflow-y-auto">
+              <div
+                v-for="task in kanbanColumns.todo"
+                :key="task.id"
+                class="flex items-center p-3 bg-white rounded-lg shadow-sm border border-neutral-200 hover:shadow-md transition-shadow"
+              >
+                <input 
+                  type="checkbox" 
+                  :checked="isTaskCompleted(task)"
+                  @change="toggleTaskStatus(task)"
+                  class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded mr-3"
+                />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="text-sm font-medium text-neutral-900">
+                        {{ task.title }}
+                      </div>
+                      <div v-if="task.description" class="text-xs text-neutral-500 mt-1 line-clamp-2">
+                        {{ stripHtml(task.description) }}
+                      </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2 ml-4">
+                      <span :class="getStatusBadgeClass(task.status)" class="px-2 py-1 text-xs font-medium rounded-full">
+                        {{ task.status }}
+                      </span>
+                      <span :class="getPriorityBadgeClass(task.priority)" class="px-2 py-1 text-xs font-medium rounded-full">
+                        {{ task.priority }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- In Progress Column -->
+          <div class="w-80 bg-neutral-50 rounded-lg border border-neutral-200">
+            <div class="p-4 border-b border-neutral-200 bg-neutral-100">
+              <h3 class="font-semibold text-neutral-800 flex items-center justify-between">
+                <span class="flex items-center">
+                  <span class="mdi mdi-arrow-right-thin mr-2 text-neutral-600"></span>
+                  In Progress
+                </span>
+                <span class="bg-neutral-200 text-neutral-700 text-xs px-2 py-1 rounded-full">
+                  {{ kanbanColumns.inProgress.length }}
+                </span>
+              </h3>
+            </div>
+            <div class="p-4 space-y-3 max-h-96 overflow-y-auto">
+              <div
+                v-for="task in kanbanColumns.inProgress"
+                :key="task.id"
+                class="flex items-center p-3 bg-white rounded-lg shadow-sm border border-neutral-200 hover:shadow-md transition-shadow"
+              >
+                <input 
+                  type="checkbox" 
+                  :checked="isTaskCompleted(task)"
+                  @change="toggleTaskStatus(task)"
+                  class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded mr-3"
+                />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="text-sm font-medium text-neutral-900">
+                        {{ task.title }}
+                      </div>
+                      <div v-if="task.description" class="text-xs text-neutral-500 mt-1 line-clamp-2">
+                        {{ stripHtml(task.description) }}
+                      </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2 ml-4">
+                      <span :class="getStatusBadgeClass(task.status)" class="px-2 py-1 text-xs font-medium rounded-full">
+                        {{ task.status }}
+                      </span>
+                      <span :class="getPriorityBadgeClass(task.priority)" class="px-2 py-1 text-xs font-medium rounded-full">
+                        {{ task.priority }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Done Column -->
+          <div class="w-80 bg-neutral-50 rounded-lg border border-neutral-200">
+            <div class="p-4 border-b border-neutral-200 bg-neutral-100">
+              <h3 class="font-semibold text-neutral-800 flex items-center justify-between">
+                <span class="flex items-center">
+                  <span class="mdi mdi-check-all mr-2 text-neutral-600"></span>
+                  Done
+                </span>
+                <span class="bg-neutral-200 text-neutral-700 text-xs px-2 py-1 rounded-full">
+                  {{ kanbanColumns.done.length }}
+                </span>
+              </h3>
+            </div>
+            <div class="p-4 space-y-3 max-h-96 overflow-y-auto">
+              <div
+                v-for="task in kanbanColumns.done"
+                :key="task.id"
+                class="flex items-center p-3 bg-white rounded-lg shadow-sm border border-neutral-200 hover:shadow-md transition-shadow"
+              >
+                <input 
+                  type="checkbox" 
+                  :checked="isTaskCompleted(task)"
+                  @change="toggleTaskStatus(task)"
+                  class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded mr-3"
+                />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="text-sm font-medium text-neutral-900">
+                        {{ task.title }}
+                      </div>
+                      <div v-if="task.description" class="text-xs text-neutral-500 mt-1 line-clamp-2">
+                        {{ stripHtml(task.description) }}
+                      </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2 ml-4">
+                      <span :class="getStatusBadgeClass(task.status)" class="px-2 py-1 text-xs font-medium rounded-full">
+                        {{ task.status }}
+                      </span>
+                      <span :class="getPriorityBadgeClass(task.priority)" class="px-2 py-1 text-xs font-medium rounded-full">
+                        {{ task.priority }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Blocked Column -->
+          <div class="w-80 bg-neutral-50 rounded-lg border border-neutral-200">
+            <div class="p-4 border-b border-neutral-200 bg-neutral-100">
+              <h3 class="font-semibold text-neutral-800 flex items-center justify-between">
+                <span class="flex items-center">
+                  <span class="mdi mdi-alert-circle-outline mr-2 text-neutral-600"></span>
+                  Blocked
+                </span>
+                <span class="bg-neutral-200 text-neutral-700 text-xs px-2 py-1 rounded-full">
+                  {{ kanbanColumns.blocked.length }}
+                </span>
+              </h3>
+            </div>
+            <div class="p-4 space-y-3 max-h-96 overflow-y-auto">
+              <div
+                v-for="task in kanbanColumns.blocked"
+                :key="task.id"
+                class="flex items-center p-3 bg-white rounded-lg shadow-sm border border-neutral-200 hover:shadow-md transition-shadow"
+              >
+                <input 
+                  type="checkbox" 
+                  :checked="isTaskCompleted(task)"
+                  @change="toggleTaskStatus(task)"
+                  class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded mr-3"
+                />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="text-sm font-medium text-neutral-900">
+                        {{ task.title }}
+                      </div>
+                      <div v-if="task.description" class="text-xs text-neutral-500 mt-1 line-clamp-2">
+                        {{ stripHtml(task.description) }}
+                      </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2 ml-4">
+                      <span :class="getStatusBadgeClass(task.status)" class="px-2 py-1 text-xs font-medium rounded-full">
+                        {{ task.status }}
+                      </span>
+                      <span :class="getPriorityBadgeClass(task.priority)" class="px-2 py-1 text-xs font-medium rounded-full">
+                        {{ task.priority }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div v-else-if="!loading" class="text-center py-12">
+      <div class="flex flex-col items-center">
+        <div class="mb-4 bg-neutral-100 rounded-full p-6 w-20 h-20 flex items-center justify-center">
+          <span class="mdi mdi-clipboard-check-outline text-4xl text-neutral-500"></span>
+        </div>
+        <h3 class="text-lg font-medium text-neutral-900 mb-1">No JIRA tasks found</h3>
+        <p class="text-neutral-500 max-w-sm mx-auto mb-4">
+          You don't have any JIRA tasks assigned across your projects. Tasks will appear here when they are assigned to you in JIRA.
+        </p>
+        <button
+          @click="fetchUserTasks"
+          class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+        >
+          <span class="mdi mdi-refresh mr-2"></span>
+          Refresh Tasks
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useAuthStore } from '~/stores/auth';
-import { useProjectsStore } from '~/stores/projects';
+import { ref, computed, onMounted } from 'vue'
+import { useAuthStore } from '~/stores/auth'
+import { useNotificationsStore } from '~/stores/notifications'
 
 definePageMeta({
   layout: 'dashboard'
-});
+})
 
-// Auth and Projects stores
-const authStore = useAuthStore();
-const projectsStore = useProjectsStore();
+const authStore = useAuthStore()
+const notificationsStore = useNotificationsStore()
 
-// Toast notifications
-function useToastification() {
-  const { $toast } = useNuxtApp();
-  
-  return {
-    success: (message) => $toast.success(message),
-    error: (message) => $toast.error(message),
-    info: (message) => $toast.info(message),
-    warning: (message) => $toast.warning(message)
-  };
+// Reactive data
+const userTasksData = ref(null)
+const loading = ref(true)
+const searchQuery = ref('')
+const viewMode = ref('projects') // 'projects', 'list', 'kanban'
+const expandedProjects = ref([])
+const selectedTab = ref('all') // 'all', 'active', 'completed', 'overdue'
+
+// Fetch user tasks from JIRA
+const fetchUserTasks = async () => {
+  loading.value = true
+  try {
+    const userEmail = authStore.userEmail
+    if (!userEmail) {
+      throw new Error('User email not found. Please log in again.')
+    }
+
+    const response = await fetch(`/api/tasks/my?userEmail=${encodeURIComponent(userEmail)}`, {
+      headers: {
+        'Authorization': authStore.authHeader
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tasks: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    if (data.success) {
+      userTasksData.value = data.data
+      // Expand all projects by default
+      expandedProjects.value = data.data.projects.map(p => p.projectId)
+      notificationsStore.success('Tasks loaded successfully')
+    } else {
+      throw new Error(data.message || 'Failed to fetch tasks')
+    }
+  } catch (error) {
+    console.error('Error fetching user tasks:', error)
+    notificationsStore.error(error.message || 'Failed to load your tasks')
+  } finally {
+    loading.value = false
+  }
 }
 
-const toast = useToastification();
-
-// Tasks data
-const tasks = ref([]);
-const userProjects = ref([]);
-const loading = ref(true);
-const searchQuery = ref('');
-const selectedTab = ref('all');
-const selectedProject = ref('all');
-
-// Fetch projects related to the logged-in user
-const fetchUserProjects = async () => {
-  try {
-    // Get the user's email from the auth store
-    const userEmail = authStore.userEmail;
-    
-    console.log('Current user email:', userEmail);
-    
-    if (!userEmail) {
-      toast.error('User email not found. Please log in again.');
-      loading.value = false;
-      return;
-    }
-    
-    // Use email as filter parameter when fetching projects
-    await projectsStore.fetchProjects();
-    
-    console.log('All projects:', projectsStore.projects);
-    
-    // Get projects from the projects store
-    userProjects.value = projectsStore.projects.filter(project => {
-      console.log('Checking project:', project);
-      // Filter projects where the user is either:
-      // - The assigned person
-      // - A developer on the project
-      // - The responsible person
-      const isAssigned = project.assignedTo === userEmail;
-      const isResponsible = project.responsiblePerson === userEmail;
-      const isDeveloper = project.developers && Array.isArray(project.developers) && project.developers.includes(userEmail);
-      
-      // If none of the above match, include the project anyway if we're in development mode
-      // This ensures we have some data to work with during development
-      const includeForTesting = true;
-      
-      return isAssigned || isResponsible || isDeveloper || includeForTesting;
-    });
-    
-    console.log('User projects found:', userProjects.value.length);
-    console.log('User projects:', userProjects.value);
-    
-    // After getting user projects, fetch tasks for these projects
-    if (userProjects.value.length > 0) {
-      await fetchTasksForProjects();
-    } else {
-      loading.value = false;
-      console.log('No projects found for the current user');
-    }
-  } catch (error) {
-    console.error('Error fetching user projects:', error);
-    toast.error('Failed to load your projects. Please try again.');
-    loading.value = false;
-  }
-};
-
-// Fetch tasks for the user's projects
-const fetchTasksForProjects = async () => {
-  try {
-    // In a real application, you would make an API call to fetch tasks for these projects
-    // For now, we'll simulate this with mock data but associate tasks with real project IDs
-    
-    console.log('Generating mock tasks for projects...');
-    
-    // Generate mock tasks for each project
-    const projectTasks = [];
-    
-    userProjects.value.forEach(project => {
-      console.log('Generating tasks for project:', project.name);
-      
-      // Generate 1-3 random tasks per project
-      const numTasks = Math.floor(Math.random() * 3) + 1;
-      console.log(`Generating ${numTasks} tasks for ${project.name}`);
-      
-      for (let i = 0; i < numTasks; i++) {
-        const task = {
-          id: `${project._id || 'unknown'}-task-${i}`,
-          projectId: project._id || 'unknown',
-          title: `Task ${i+1} for ${project.name}`,
-          description: `This is a sample task for the project ${project.name}`,
-          status: ['To Do', 'In Progress', 'Completed'][Math.floor(Math.random() * 3)],
-          priority: ['Low', 'Medium', 'High'][Math.floor(Math.random() * 3)],
-          dueDate: getRandomDueDate(),
-          createdAt: new Date().toISOString().split('T')[0]
-        };
-        
-        projectTasks.push(task);
-        console.log('Created task:', task);
-      }
-    });
-    
-    // Add a task that's definitely overdue (using a past date)
-    const pastDate = new Date();
-    pastDate.setDate(pastDate.getDate() - 5); // 5 days in the past
-    
-    if (userProjects.value[0]) {
-      const overdueTask = {
-        id: 'overdue-task-1',
-        projectId: userProjects.value[0]._id || 'unknown',
-        title: 'Overdue Task Example',
-        description: 'This task is deliberately set to be overdue',
-        status: 'In Progress',
-        priority: 'High',
-        dueDate: pastDate.toISOString().split('T')[0], // Past date to ensure it's overdue
-        createdAt: '2023-04-20'
-      };
-      
-      projectTasks.push(overdueTask);
-      console.log('Created overdue task:', overdueTask);
-    }
-    
-    tasks.value = projectTasks;
-    console.log('Total tasks generated:', tasks.value.length);
-    
-    loading.value = false;
-  } catch (error) {
-    console.error('Error generating mock tasks:', error);
-    toast.error('Failed to load your tasks. Please try again.');
-    loading.value = false;
-  }
-};
-
-// Helper function to generate random due dates
-const getRandomDueDate = () => {
-  const today = new Date();
-  // Random number of days between -5 and 30 (some overdue, some due in the future)
-  const daysToAdd = Math.floor(Math.random() * 36) - 5;
-  const dueDate = new Date(today);
-  dueDate.setDate(today.getDate() + daysToAdd);
-  return dueDate.toISOString().split('T')[0];
-};
-
-// Get project name by project ID
-const getProjectName = (projectId) => {
-  const project = userProjects.value.find(p => p._id === projectId);
-  return project ? project.name : 'Unknown Project';
-};
-
-// Filter tasks by project
-const filterTasksByProject = () => {
-  // The filtering is handled by the filteredTasks computed property
-  // This function is just a placeholder for any additional logic needed
-  console.log('Filtering by project:', selectedProject.value);
-};
-
-onMounted(async () => {
-  loading.value = true;
-  await fetchUserProjects();
-});
-
-// Computed properties for filtering tasks
-const filteredTasks = computed(() => {
-  let filtered = [...tasks.value];
+// Computed properties
+const filteredProjects = computed(() => {
+  if (!userTasksData.value?.projects) return []
   
-  // Filter by project
-  if (selectedProject.value !== 'all') {
-    filtered = filtered.filter(task => task.projectId === selectedProject.value);
-  }
+  let projects = userTasksData.value.projects
   
-  // Filter by tab
-  if (selectedTab.value === 'active') {
-    filtered = filtered.filter(task => task.status !== 'Completed');
-  } else if (selectedTab.value === 'completed') {
-    filtered = filtered.filter(task => task.status === 'Completed');
-  } else if (selectedTab.value === 'overdue') {
-    filtered = filtered.filter(task => isOverdue(task) && task.status !== 'Completed');
-  }
-  
-  // Filter by search query
   if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter(task => 
-      task.title.toLowerCase().includes(query) ||
-      task.description.toLowerCase().includes(query) ||
-      getProjectName(task.projectId).toLowerCase().includes(query)
-    );
+    const query = searchQuery.value.toLowerCase()
+    projects = projects.filter(project => 
+      project.projectName.toLowerCase().includes(query) ||
+      project.tasks.some(task => 
+        task.title.toLowerCase().includes(query) ||
+        task.description?.toLowerCase().includes(query) ||
+        task.issueKey?.toLowerCase().includes(query)
+      )
+    )
+    
+    // Also filter tasks within projects
+    projects = projects.map(project => ({
+      ...project,
+      tasks: project.tasks.filter(task =>
+        task.title.toLowerCase().includes(query) ||
+        task.description?.toLowerCase().includes(query) ||
+        task.issueKey?.toLowerCase().includes(query)
+      )
+    }))
   }
   
-  return filtered;
-});
+  return projects
+})
 
-// Task statistics
-const totalTasks = computed(() => tasks.value.length);
-const completedTasks = computed(() => tasks.value.filter(task => task.status === 'Completed').length);
-const inProgressTasks = computed(() => tasks.value.filter(task => task.status === 'In Progress').length);
-const overdueTasks = computed(() => tasks.value.filter(task => isOverdue(task) && task.status !== 'Completed').length);
+const allTasks = computed(() => {
+  if (!userTasksData.value?.projects) return []
+  return userTasksData.value.projects.flatMap(project => 
+    project.tasks.map(task => ({
+      ...task,
+      projectId: project.projectId,
+      projectName: project.projectName
+    }))
+  )
+})
+
+const kanbanColumns = computed(() => {
+  const tasks = allTasks.value
+  return {
+    todo: tasks.filter(task => ['To Do', 'Open', 'New'].includes(task.status)),
+    inProgress: tasks.filter(task => ['In Progress', 'In Development', 'In Review'].includes(task.status)),
+    done: tasks.filter(task => ['Done', 'Closed', 'Resolved', 'Completed'].includes(task.status)),
+    blocked: tasks.filter(task => ['Blocked', 'Impediment'].includes(task.status))
+  }
+})
 
 // Helper functions
-const formatDate = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
+const getProgressWidth = (type) => {
+  if (!userTasksData.value?.stats?.totalTasks) return 0
+  const total = userTasksData.value.stats.totalTasks
+  let count = 0
+  
+  switch (type) {
+    case 'inProgress':
+      count = userTasksData.value.stats.inProgressTasks || 0
+      break
+    case 'completed':
+      count = userTasksData.value.stats.completedTasks || 0
+      break
+    case 'overdue':
+      count = userTasksData.value.stats.overdueTasks || 0
+      break
+  }
+  
+  return total > 0 ? (count / total) * 100 : 0
+}
+
+const toggleProjectExpansion = (projectId) => {
+  const index = expandedProjects.value.indexOf(projectId)
+  if (index > -1) {
+    expandedProjects.value.splice(index, 1)
+  } else {
+    expandedProjects.value.push(projectId)
+  }
+}
+
+const getProjectTasksByStatus = (project, status) => {
+  return project.tasks.filter(task => task.status === status)
+}
+
+const getProjectOverdueTasks = (project) => {
+  return project.tasks.filter(task => isTaskOverdue(task))
+}
+
+const isTaskCompleted = (task) => {
+  return ['Done', 'Closed', 'Resolved', 'Completed'].includes(task.status)
+}
+
+const isTaskOverdue = (task) => {
+  if (!task.dueDate || isTaskCompleted(task)) return false
+  return new Date(task.dueDate) < new Date()
+}
+
+const stripHtml = (html) => {
+  if (!html) return ''
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  return tmp.textContent || tmp.innerText || ''
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric'
-  });
-};
+  })
+}
 
-const isOverdue = (task) => {
-  if (task.status === 'Completed') return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Start of today
-  const dueDate = new Date(task.dueDate);
-  return dueDate < today;
-};
+const formatRelativeDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24))
+  
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+  return formatDate(dateStr)
+}
+
+const getProjectName = (projectId) => {
+  const project = userTasksData.value?.projects?.find(p => p.projectId === projectId)
+  return project?.projectName || 'Unknown Project'
+}
 
 const getStatusBadgeClass = (status) => {
-  switch (status) {
-    case 'Completed':
-      return 'bg-success-100 text-success-800';
-    case 'In Progress':
-      return 'bg-accent-100 text-accent-700';
-    case 'To Do':
-      return 'bg-neutral-100 text-neutral-700';
-    default:
-      return 'bg-neutral-100 text-neutral-700';
+  if (['Done', 'Closed', 'Resolved', 'Completed'].includes(status)) {
+    return 'bg-success-100 text-success-800'
+  } else if (['In Progress', 'In Development', 'In Review'].includes(status)) {
+    return 'bg-orange-100 text-orange-800'
+  } else if (['Blocked', 'Impediment'].includes(status)) {
+    return 'bg-error-100 text-error-800'
+  } else {
+    return 'bg-blue-100 text-blue-800'
   }
-};
+}
 
 const getPriorityBadgeClass = (priority) => {
-  switch (priority) {
-    case 'High':
-      return 'bg-red-100 text-red-800';
-    case 'Medium':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'Low':
-      return 'bg-green-100 text-green-800';
-    default:
-      return 'bg-neutral-100 text-neutral-700';
-  }
-};
-
-// Task actions
-const toggleTaskStatus = (task) => {
-  if (task.status === 'Completed') {
-    task.status = 'In Progress';
-    toast.info(`Task "${task.title}" marked as in progress`);
+  const priorityLower = priority?.toLowerCase() || ''
+  if (['highest', 'critical'].includes(priorityLower)) {
+    return 'bg-error-100 text-error-800'
+  } else if (['high'].includes(priorityLower)) {
+    return 'bg-warning-100 text-warning-800'
+  } else if (['medium'].includes(priorityLower)) {
+    return 'bg-yellow-100 text-yellow-800'
   } else {
-    task.status = 'Completed';
-    toast.success(`Task "${task.title}" completed!`);
+    return 'bg-neutral-100 text-neutral-800'
   }
-};
+}
+
+// Actions
+const toggleTaskStatus = async (task) => {
+  // In a real implementation, you'd call JIRA API to update the task status
+  notificationsStore.info(`Task status update for JIRA issue ${task.issueKey} would be synced to JIRA`)
+}
+
+const openInJira = (jiraUrl) => {
+  window.open(jiraUrl, '_blank')
+}
 
 const viewTaskDetails = (task) => {
-  // In a real application, this would navigate to a task detail page or open a modal
-  toast.info(`Viewing details for: ${task.title}`);
-};
+  // Could open a modal or navigate to task details
+  notificationsStore.info(`Viewing details for: ${task.title}`)
+}
+
+// Initialize
+onMounted(() => {
+  fetchUserTasks()
+})
 </script>
 
 <style scoped>
 .shadow-card {
   box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  line-clamp: 1;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 /* Animation for hover effects */
