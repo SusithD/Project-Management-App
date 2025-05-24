@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
 import { useNotificationsStore } from '~/stores/notifications';
@@ -51,6 +51,9 @@ const uploadProgress = ref(0);
 const isEditing = ref(false);
 const editedProject = ref(null);
 const projectStatuses = ['Not Started', 'Ongoing', 'On Hold', 'Completed', 'Cancelled'];
+
+// New reactive state for enhanced UI
+const showMoreActions = ref(false);
 
 // Add a computed property to determine if we're in edit mode with data
 const hasExistingTeamMembers = computed(() => 
@@ -561,6 +564,237 @@ const handleIssuesUpdated = (issuesData) => {
   // Handle updates to issues data if needed
   console.log('Issues updated:', issuesData);
 };
+
+// New methods for enhanced functionality
+const exportProject = async () => {
+  try {
+    const projectData = {
+      ...project.value,
+      exportDate: new Date().toISOString(),
+      exportedBy: authStore.userFullName
+    };
+    
+    const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project.value.name}_export_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    notificationsStore.success('Project exported successfully');
+    showMoreActions.value = false;
+  } catch (err) {
+    console.error('Error exporting project:', err);
+    notificationsStore.error('Failed to export project');
+  }
+};
+
+const duplicateProject = async () => {
+  const confirmed = await notificationsStore.confirm(
+    'Create a duplicate of this project?',
+    {
+      confirmText: 'Duplicate',
+      cancelText: 'Cancel',
+      type: 'info'
+    }
+  );
+  
+  if (!confirmed) return;
+  
+  try {
+    const duplicatedProject = {
+      ...project.value,
+      name: `${project.value.name} (Copy)`,
+      status: 'Not Started',
+      progress: 0,
+      updates: [],
+      files: [],
+      // Reset dates
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: null,
+      deadline: null
+    };
+    
+    // Remove ID fields that should be auto-generated
+    delete duplicatedProject.id;
+    delete duplicatedProject._id;
+    
+    const response = await fetch('/api/projects', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authStore.authHeader
+      },
+      body: JSON.stringify(duplicatedProject)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to duplicate project: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    notificationsStore.success('Project duplicated successfully');
+    
+    // Navigate to the new project
+    router.push(`/projects/${data.id}`);
+    showMoreActions.value = false;
+  } catch (err) {
+    console.error('Error duplicating project:', err);
+    notificationsStore.error('Failed to duplicate project');
+  }
+};
+
+const archiveProject = async () => {
+  const confirmed = await notificationsStore.confirm(
+    'Archive this project? It will be hidden from active project lists.',
+    {
+      confirmText: 'Archive',
+      cancelText: 'Cancel',
+      type: 'warning'
+    }
+  );
+  
+  if (!confirmed) return;
+  
+  try {
+    editedProject.value = { 
+      ...project.value, 
+      status: 'Archived',
+      archivedDate: new Date().toISOString(),
+      archivedBy: authStore.userId
+    };
+    
+    await saveProject();
+    notificationsStore.success(`${project.value.name} has been archived`);
+    showMoreActions.value = false;
+    
+    // Optionally navigate back to projects list
+    setTimeout(() => {
+      router.push('/projects');
+    }, 2000);
+  } catch (err) {
+    console.error('Error archiving project:', err);
+    notificationsStore.error('Failed to archive project');
+  }
+};
+
+// File handling methods
+const handleFileSelect = (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    selectedFile.value = file;
+  }
+};
+
+const uploadFile = async () => {
+  if (!selectedFile.value) return;
+  
+  uploadingFile.value = true;
+  uploadProgress.value = 0;
+  
+  try {
+    const formData = new FormData();
+    formData.append('file', selectedFile.value);
+    
+    const idToUse = mongoObjectId.value || project.value?._id;
+    
+    if (!idToUse) {
+      throw new Error("No valid MongoDB ID available");
+    }
+    
+    const response = await fetch(`/api/projects/${idToUse}/files`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authStore.authHeader
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Add to local state
+    if (!project.value.files) {
+      project.value.files = [];
+    }
+    
+    project.value.files.push({
+      name: selectedFile.value.name,
+      size: selectedFile.value.size,
+      type: selectedFile.value.type,
+      uploadDate: new Date().toISOString().split('T')[0],
+      uploadedBy: authStore.userFullName
+    });
+    
+    notificationsStore.success('File uploaded successfully');
+    selectedFile.value = null;
+    
+    // Reset file input
+    if (fileInput.value) {
+      fileInput.value.value = '';
+    }
+  } catch (err) {
+    console.error('Error uploading file:', err);
+    notificationsStore.error('Failed to upload file');
+  } finally {
+    uploadingFile.value = false;
+    uploadProgress.value = 0;
+  }
+};
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const downloadFile = (file) => {
+  // Implement file download logic
+  const link = document.createElement('a');
+  link.href = `/api/projects/${mongoObjectId.value || project.value._id}/files/${encodeURIComponent(file.name)}`;
+  link.download = file.name;
+  link.click();
+};
+
+// Close dropdown when clicking outside
+const closeDropdownOnClickOutside = (event) => {
+  if (!event.target.closest('.relative')) {
+    showMoreActions.value = false;
+  }
+};
+
+// Add click outside listener
+onMounted(async () => {
+  // Make sure users are loaded first, so they're available for the UserSelect components
+  try {
+    await usersStore.fetchUsers();
+    console.log('Users loaded successfully:', usersStore.users.length);
+  } catch (error) {
+    console.error('Error loading users:', error);
+  }
+  
+  // Then fetch the project
+  await fetchProject();
+  
+  // Initialize missing updates check
+  checkMissingDailyUpdates();
+  
+  // Add click outside listener for dropdown
+  document.addEventListener('click', closeDropdownOnClickOutside);
+});
+
+// Clean up listener
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdownOnClickOutside);
+});
 </script>
 
 <template>
@@ -591,71 +825,279 @@ const handleIssuesUpdated = (issuesData) => {
     
     <!-- Project Details -->
     <div v-else>
-      <!-- Header with Actions -->
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <div>
-          <div class="flex items-center">
-            <h1 class="text-2xl font-bold text-neutral-900">{{ project?.name }}</h1>
-            <span 
-              v-if="project && project.status"
-              :class="[
-                'ml-4 px-3 py-1 text-xs font-medium rounded-full',
-                project.status === 'Completed' ? 'bg-success-100 text-success-800' : 
-                project.status === 'Ongoing' ? 'bg-accent-100 text-accent-800' : 
-                project.status === 'On Hold' ? 'bg-warning-100 text-warning-800' :
-                project.status === 'Cancelled' ? 'bg-error-100 text-error-800' :
-                'bg-neutral-100 text-neutral-800'
-              ]"
-            >
-              {{ project.status }}
-            </span>
+      <!-- Breadcrumb Navigation -->
+      <nav class="flex items-center space-x-2 text-sm text-neutral-600 mb-4">
+        <NuxtLink to="/dashboard" class="hover:text-primary-600 transition-colors">
+          <span class="mdi mdi-view-dashboard mr-1"></span>
+          Dashboard
+        </NuxtLink>
+        <span class="mdi mdi-chevron-right"></span>
+        <NuxtLink to="/projects" class="hover:text-primary-600 transition-colors">
+          Projects
+        </NuxtLink>
+        <span class="mdi mdi-chevron-right"></span>
+        <span class="text-neutral-900 font-medium">{{ project?.name }}</span>
+      </nav>
+
+      <!-- Enhanced Header with Quick Actions -->
+      <div class="bg-white rounded-xl shadow-lg p-6 mb-6 border-l-4 border-primary-600">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex-1">
+            <div class="flex flex-wrap items-center gap-3 mb-2">
+              <h1 class="text-3xl font-bold text-neutral-900">{{ project?.name }}</h1>
+              <span 
+                v-if="project && project.status"
+                :class="[
+                  'px-3 py-1 text-xs font-medium rounded-full',
+                  project.status === 'Completed' ? 'bg-success-100 text-success-800' : 
+                  project.status === 'Ongoing' ? 'bg-accent-100 text-accent-800' : 
+                  project.status === 'On Hold' ? 'bg-warning-100 text-warning-800' :
+                  project.status === 'Cancelled' ? 'bg-error-100 text-error-800' :
+                  'bg-neutral-100 text-neutral-800'
+                ]"
+              >
+                {{ project.status }}
+              </span>
+              <span v-if="project?.priority" 
+                    :class="[
+                      'px-2 py-1 text-xs font-medium rounded-full',
+                      project.priority === 'Urgent' ? 'bg-error-100 text-error-800' :
+                      project.priority === 'High' ? 'bg-warning-100 text-warning-800' :
+                      project.priority === 'Medium' ? 'bg-accent-100 text-accent-800' :
+                      'bg-neutral-100 text-neutral-800'
+                    ]">
+                <span class="mdi mdi-flag mr-1"></span>
+                {{ project.priority }} Priority
+              </span>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-4 text-sm text-neutral-600">
+              <span><strong>ID:</strong> {{ project?.id }}</span>
+              <span v-if="project?.company"><strong>Company:</strong> {{ project.company }}</span>
+              <span v-if="project?.category"><strong>Category:</strong> {{ project.category }}</span>
+              <span v-if="project?.assignedTo"><strong>Lead:</strong> {{ getUserName(project.assignedTo) }}</span>
+            </div>
+
+            <!-- Quick Stats Bar -->
+            <div class="flex flex-wrap items-center gap-6 mt-4 p-3 bg-neutral-50 rounded-lg">
+              <div class="flex items-center text-sm">
+                <span class="mdi mdi-chart-line text-primary-600 mr-1"></span>
+                <span class="font-medium">{{ project?.progress || 0 }}% Complete</span>
+              </div>
+              <div class="flex items-center text-sm">
+                <span class="mdi mdi-calendar text-accent-600 mr-1"></span>
+                <span class="font-medium">{{ Math.abs(daysRemaining) }} days {{ isOverdue ? 'overdue' : 'remaining' }}</span>
+              </div>
+              <div class="flex items-center text-sm">
+                <span class="mdi mdi-account-group text-success-600 mr-1"></span>
+                <span class="font-medium">{{ formattedTeamData.total }} team members</span>
+              </div>
+              <div v-if="project?.blockers" class="flex items-center text-sm text-error-600">
+                <span class="mdi mdi-alert-circle mr-1"></span>
+                <span class="font-medium">Has blockers</span>
+              </div>
+            </div>
           </div>
-          <p class="text-neutral-600 mt-1">Project ID: {{ project?.id }}</p>
-        </div>
-        
-        <!-- Primary Action Buttons - At the top of the page -->
-        <div class="flex items-center space-x-3 mt-4 md:mt-0">
-          <!-- Edit Project - Only show when not editing -->
-          <button 
-            v-if="!isEditing && canEdit"
-            @click="toggleEditMode" 
-            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 shadow-sm"
-          >
-            <span class="mdi mdi-pencil text-lg mr-2"></span>
-            Edit Project
-          </button>
           
-          <!-- Mark as completed - Only show when project isn't completed and user has edit permission -->
-          <button 
-            v-if="!isEditing && project?.status !== 'Completed' && canEdit"
-            @click="markProjectCompleted"
-            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md bg-success-600 text-white hover:bg-success-700 shadow-sm"
-          >
-            <span class="mdi mdi-check-circle text-lg mr-2"></span>
-            Mark Completed
-          </button>
-          
-          <!-- Save/Cancel - Only show during edit mode -->
-          <button 
-            v-if="isEditing"
-            @click="saveProject" 
-            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md bg-success-600 text-white hover:bg-success-700 shadow-sm"
-          >
-            <span class="mdi mdi-content-save text-lg mr-2"></span>
-            Save Changes
-          </button>
-          
-          <button 
-            v-if="isEditing"
-            @click="toggleEditMode" 
-            class="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md bg-white text-neutral-700 hover:bg-neutral-50"
-          >
-            <span class="mdi mdi-close text-lg mr-2"></span>
-            Cancel
-          </button>
+          <!-- Quick Action Buttons -->
+          <div class="flex flex-wrap items-center gap-3 mt-4 lg:mt-0 lg:ml-6">
+            <!-- Quick Status Updates -->
+            <div class="flex items-center bg-neutral-100 rounded-lg p-1">
+              <button 
+                v-if="!isEditing && project?.status !== 'Completed' && canEdit"
+                @click="markProjectCompleted"
+                class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-success-600 text-white hover:bg-success-700 transition-colors"
+                title="Mark as completed"
+              >
+                <span class="mdi mdi-check-circle mr-1"></span>
+                Complete
+              </button>
+              
+              <button 
+                v-if="!isEditing && canEdit"
+                @click="toggleEditMode" 
+                class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors ml-1"
+                title="Edit project"
+              >
+                <span class="mdi mdi-pencil mr-1"></span>
+                Edit
+              </button>
+              
+              <!-- Save/Cancel during edit mode -->
+              <button 
+                v-if="isEditing"
+                @click="saveProject" 
+                class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-success-600 text-white hover:bg-success-700 transition-colors"
+              >
+                <span class="mdi mdi-content-save mr-1"></span>
+                Save
+              </button>
+              
+              <button 
+                v-if="isEditing"
+                @click="toggleEditMode" 
+                class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-200 text-neutral-700 hover:bg-neutral-300 transition-colors ml-1"
+              >
+                <span class="mdi mdi-close mr-1"></span>
+                Cancel
+              </button>
+            </div>
+
+            <!-- More Actions Dropdown -->
+            <div class="relative" v-if="!isEditing">
+              <button 
+                @click="showMoreActions = !showMoreActions"
+                class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors"
+              >
+                <span class="mdi mdi-dots-vertical mr-1"></span>
+                More
+              </button>
+              
+              <!-- Dropdown Menu -->
+              <div v-show="showMoreActions" 
+                   class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-neutral-200 z-10">
+                <div class="py-1">
+                  <button @click="exportProject" 
+                          class="block w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
+                    <span class="mdi mdi-download mr-2"></span>
+                    Export Project
+                  </button>
+                  <button @click="duplicateProject" 
+                          class="block w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
+                    <span class="mdi mdi-content-duplicate mr-2"></span>
+                    Duplicate Project
+                  </button>
+                  <button @click="archiveProject" 
+                          class="block w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
+                    <span class="mdi mdi-archive mr-2"></span>
+                    Archive Project
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
+      <!-- Smart Alerts & Notifications -->
+      <div class="space-y-3 mb-6">
+        <!-- Overdue Alert -->
+        <div v-if="isOverdue" class="bg-error-50 border-l-4 border-error-500 p-4 rounded-md">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <span class="mdi mdi-alert-circle text-xl text-error-500"></span>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-error-800">Project Overdue</h3>
+              <div class="mt-2 text-sm text-error-700">
+                <p>This project is {{ Math.abs(daysRemaining) }} days overdue. Consider updating the timeline or marking it as completed if finished.</p>
+              </div>
+              <div class="mt-3">
+                <div class="flex space-x-3">
+                  <button @click="activeTab = 'overview'; timelineExpanded = true" 
+                          class="text-xs bg-error-100 text-error-800 px-3 py-1 rounded-md hover:bg-error-200 transition-colors">
+                    Update Timeline
+                  </button>
+                  <button v-if="canEdit" @click="markProjectCompleted" 
+                          class="text-xs bg-error-600 text-white px-3 py-1 rounded-md hover:bg-error-700 transition-colors">
+                    Mark Complete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Due Soon Alert -->
+        <!-- <div v-else-if="daysRemaining <= 7 && daysRemaining > 0 && project?.status !== 'Completed'" 
+             class="bg-warning-50 border-l-4 border-warning-500 p-4 rounded-md">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <span class="mdi mdi-clock-alert text-xl text-warning-500"></span>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-warning-800">Due Soon</h3>
+              <div class="mt-2 text-sm text-warning-700">
+                <p>This project is due in {{ daysRemaining }} {{ daysRemaining === 1 ? 'day' : 'days' }}. Make sure the team is on track.</p>
+              </div>
+            </div>
+          </div>
+        </div> -->
+
+        <!-- Blockers Alert -->
+        <!-- <div v-if="project?.blockers" class="bg-error-50 border-l-4 border-error-500 p-4 rounded-md">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <span class="mdi mdi-alert-octagon text-xl text-error-500"></span>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-error-800">Active Blockers</h3>
+              <div class="mt-2 text-sm text-error-700">
+                <p>This project has blockers that need attention. Review and resolve them to keep the project on track.</p>
+              </div>
+              <div class="mt-3">
+                <button @click="activeTab = 'overview'; blockersExpanded = true" 
+                        class="text-xs bg-error-100 text-error-800 px-3 py-1 rounded-md hover:bg-error-200 transition-colors">
+                  View Blockers
+                </button>
+              </div>
+            </div>
+          </div>
+        </div> -->
+
+        <!-- Missing Daily Updates Alert -->
+        <!-- <div v-if="missingUpdates.length > 0" class="bg-warning-50 border-l-4 border-warning-500 p-4 rounded-md">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <span class="mdi mdi-account-clock text-xl text-warning-500"></span>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-warning-800">Missing Daily Updates</h3>
+              <div class="mt-2 text-sm text-warning-700">
+                <p>{{ missingUpdates.length }} team {{ missingUpdates.length === 1 ? 'member needs' : 'members need' }} to provide daily updates.</p>
+              </div>
+              <div class="mt-3">
+                <button @click="activeTab = 'updates'" 
+                        class="text-xs bg-warning-100 text-warning-800 px-3 py-1 rounded-md hover:bg-warning-200 transition-colors">
+                  View Updates
+                </button>
+              </div>
+            </div>
+          </div>
+        </div> -->
+
+        <!-- Low Progress Alert -->
+        <!-- <div v-if="project?.progress < 25 && !isOverdue && project?.status === 'Ongoing'" 
+             class="bg-accent-50 border-l-4 border-accent-500 p-4 rounded-md">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <span class="mdi mdi-chart-line-variant text-xl text-accent-500"></span>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-accent-800">Low Progress</h3>
+              <div class="mt-2 text-sm text-accent-700">
+                <p>Project progress is at {{ project.progress }}%. Consider checking with the team or updating the progress.</p>
+              </div>
+            </div>
+          </div>
+        </div> -->
+
+        <!-- Success Messages -->
+        <div v-if="project?.status === 'Completed'" class="bg-success-50 border-l-4 border-success-500 p-4 rounded-md">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <span class="mdi mdi-check-circle text-xl text-success-500"></span>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-success-800">Project Completed</h3>
+              <div class="mt-2 text-sm text-success-700">
+                <p>Congratulations! This project has been successfully completed.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <!-- KPI Dashboard - New compact dashboard showing key metrics -->
       <div class="bg-white rounded-xl shadow-lg p-5 mb-6 border-l-4 border-primary-600">
         <h2 class="text-lg font-semibold text-neutral-800 mb-4 flex items-center">
@@ -681,27 +1123,30 @@ const handleIssuesUpdated = (issuesData) => {
             </div>
             <div class="flex items-end justify-between">
               <div class="text-2xl font-bold text-neutral-900">{{ project?.progress || 0 }}%</div>
-              <div class="w-20 h-20 relative">
-                <svg class="w-full h-full" viewBox="0 0 36 36">
+              <div class="w-16 h-16 relative">
+                <!-- Circular Progress Indicator -->
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                   <path
-                    class="stroke-current text-neutral-200"
+                    d="M18 2.0845
+                      a 15.9155 15.9155 0 0 1 0 31.831
+                      a 15.9155 15.9155 0 0 1 0 -31.831"
                     fill="none"
-                    stroke-width="3.8"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    stroke="#e5e7eb"
+                    stroke-width="3"
                   />
                   <path
-                    :class="[
-                      'stroke-current',
-                      project?.progress >= 75 ? 'text-success-600' : 
-                      project?.progress >= 50 ? 'text-accent-600' : 
-                      'text-warning-600'
-                    ]"
+                    d="M18 2.0845
+                      a 15.9155 15.9155 0 0 1 0 31.831
+                      a 15.9155 15.9155 0 0 1 0 -31.831"
                     fill="none"
-                    stroke-width="3.8"
+                    :stroke="project?.progress >= 75 ? '#10b981' : project?.progress >= 50 ? '#3b82f6' : '#f59e0b'"
+                    stroke-width="3"
                     :stroke-dasharray="`${project?.progress || 0}, 100`"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   />
                 </svg>
+                <div class="absolute inset-0 flex items-center justify-center">
+                  <span class="text-xs font-bold text-neutral-700">{{ project?.progress || 0 }}%</span>
+                </div>
               </div>
             </div>
           </div>
@@ -713,8 +1158,8 @@ const handleIssuesUpdated = (issuesData) => {
               <div 
                 :class="[
                   'text-xs px-2 py-0.5 rounded-full',
-                  isOverdue ? 'bg-error-100 text-error-800' :
-                  daysRemaining < 7 ? 'bg-warning-100 text-warning-800' :
+                  isOverdue ? 'bg-error-100 text-error-800' : 
+                  daysRemaining < 7 ? 'bg-warning-100 text-warning-800' : 
                   'bg-success-100 text-success-800'
                 ]"
               >
@@ -728,10 +1173,10 @@ const handleIssuesUpdated = (issuesData) => {
               </div>
               <div 
                 :class="[
-                  'flex items-center justify-center w-12 h-12 rounded-full text-white text-xl',
-                  isOverdue ? 'bg-error-600' :
-                  daysRemaining < 7 ? 'bg-warning-600' : 
-                  'bg-success-600'
+                  'w-12 h-12 rounded-full flex items-center justify-center text-xl',
+                  isOverdue ? 'bg-error-600 text-white' : 
+                  daysRemaining < 7 ? 'bg-warning-600 text-white' : 
+                  'bg-success-600 text-white'
                 ]"
               >
                 <span v-if="isOverdue" class="mdi mdi-alert-circle"></span>
@@ -753,11 +1198,14 @@ const handleIssuesUpdated = (issuesData) => {
               <div class="flex-1">
                 <div class="text-2xl font-bold text-neutral-900">{{ formattedTeamData.total }}</div>
                 <div class="flex flex-wrap gap-2 mt-1">
-                  <span class="text-xs px-2 py-0.5 bg-accent-100 text-accent-800 rounded-full">
-                    {{ formattedTeamData.members }} Team
+                  <span class="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded">
+                    {{ formattedTeamData.leadership }} leads
                   </span>
-                  <span class="text-xs px-2 py-0.5 bg-success-100 text-success-800 rounded-full">
-                    {{ formattedTeamData.developers }} Devs
+                  <span class="text-xs bg-accent-50 text-accent-700 px-2 py-0.5 rounded">
+                    {{ formattedTeamData.members }} members
+                  </span>
+                  <span class="text-xs bg-success-50 text-success-700 px-2 py-0.5 rounded">
+                    {{ formattedTeamData.developers }} devs
                   </span>
                 </div>
               </div>
@@ -770,7 +1218,7 @@ const handleIssuesUpdated = (issuesData) => {
           <!-- Status KPI -->
           <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow p-4 border border-neutral-100 flex flex-col justify-between">
             <div class="flex justify-between items-start mb-3">
-              <div class="text-neutral-500 text-sm font-medium">Blockers</div>
+              <div class="text-neutral-500 text-sm font-medium">Status</div>
               <div 
                 :class="[
                   'text-xs px-2 py-0.5 rounded-full',
@@ -783,14 +1231,14 @@ const handleIssuesUpdated = (issuesData) => {
             <div class="flex items-center justify-between">
               <div>
                 <div class="text-2xl font-bold text-neutral-900">
-                  {{ project?.priority || 'N/A' }}
+                  {{ project?.priority || 'Normal' }}
                 </div>
                 <div class="text-sm text-neutral-600">Priority</div>
               </div>
               <div 
                 :class="[
-                  'flex items-center justify-center w-12 h-12 rounded-full text-white text-xl',
-                  project?.blockers ? 'bg-error-600' : 'bg-success-600',
+                  'w-12 h-12 rounded-full flex items-center justify-center text-xl',
+                  project?.blockers ? 'bg-error-600 text-white' : 'bg-success-600 text-white',
                 ]"
               >
                 <span v-if="project?.blockers" class="mdi mdi-alert-octagon"></span>
@@ -1415,7 +1863,7 @@ const handleIssuesUpdated = (issuesData) => {
               <!-- Blockers -->
               <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-error-500">
                 <label for="project-blockers" class="block text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
-                  <span class="mdi mdi-alert-circle text-error-600"></span>
+                  <span class="mdi mdi-alert-circle text-error-600 mr-2"></span>
                   Blockers
                 </label>
                 <div class="relative">
@@ -1435,7 +1883,7 @@ const handleIssuesUpdated = (issuesData) => {
               <!-- Feedback for Blockers -->
               <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-accent-500">
                 <label for="project-feedback" class="block text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
-                  <span class="mdi mdi-message-reply text-accent-600"></span>
+                  <span class="mdi mdi-message-reply text-accent-600 mr-2"></span>
                   Feedback for Blockers
                 </label>
                 <div class="relative">
@@ -2015,10 +2463,7 @@ const handleIssuesUpdated = (issuesData) => {
               <div class="h-3 bg-neutral-100 rounded-full overflow-hidden relative">
                 <div
                   class="absolute h-full bg-primary-500 rounded-full"
-                  :style="{
-                    width: isOverdue ? '100%' : `${project.progress}%`,
-                    backgroundColor: isOverdue ? 'var(--color-error-600)' : undefined
-                  }"
+                  :style="`width: ${editedProject.progress}%`"
                 ></div>
               </div>
               <div class="flex justify-between mt-2">
@@ -2528,7 +2973,7 @@ const handleIssuesUpdated = (issuesData) => {
           <!-- No developers placeholder -->
           <div v-else class="bg-neutral-50 rounded-lg p-8 text-center">
             <div class="h-16 w-16 rounded-full bg-neutral-200 mx-auto flex items-center justify-center mb-3">
-              <span class="mdi mdi-laptop text-2xl text-neutral-400"></span>
+              <span class="mdi mdi-laptop-off text-2xl text-neutral-400"></span>
             </div>
             <h4 class="text-neutral-600 font-medium mb-2">No Developers Assigned</h4>
             <p class="text-neutral-500 text-sm max-w-md mx-auto">
@@ -2685,7 +3130,7 @@ const handleIssuesUpdated = (issuesData) => {
                   Manage Jira project integration
                 </p>
               </div>
-            </div>
+            </div
             
             <!-- Integration Status Badge -->
             <div class="flex items-center space-x-3">
@@ -2729,7 +3174,8 @@ const handleIssuesUpdated = (issuesData) => {
               
               <button @click="openJiraProject"
                       v-if="project?.jiraIntegration?.projectKey"
-                      class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-blue-300 text-blue-700 bg-white hover:bg-blue-50">
+                      class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 focus:outline-none"
+              >
                 <span class="mdi mdi-open-in-new text-base mr-1"></span>
                 Open in Jira
               </button>
@@ -2760,7 +3206,8 @@ const handleIssuesUpdated = (issuesData) => {
           
           <!-- Link to Overview tab where JiraProjectLinker is -->
           <button @click="activeTab = 'overview'"
-                  class="inline-flex items-center px-6 py-3 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
+                  class="inline-flex items-center px-6 py-3 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+          >
             <span class="mdi mdi-link-variant text-base mr-2"></span>
             Set Up Jira Integration
           </button>
