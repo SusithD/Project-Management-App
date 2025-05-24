@@ -59,6 +59,21 @@ export interface Project {
     figmaLink: string;
     jiraProject: string;
   };
+  // Enhanced JIRA integration fields
+  jiraIntegration?: {
+    enabled: boolean;
+    projectKey: string;
+    projectId: string;
+    projectName: string;
+    lastSyncDate?: string;
+    syncEnabled: boolean;
+    issueMapping?: {
+      [key: string]: string; // Maps project task IDs to JIRA issue keys
+    };
+    statusMapping?: {
+      [key: string]: string; // Maps project statuses to JIRA statuses
+    };
+  };
   files?: ProjectFile[];
 }
 
@@ -237,6 +252,49 @@ export const projectValidationSchema = {
             jiraProject: {
               bsonType: 'string',
               description: 'must be a string'
+            }
+          }
+        },
+        jiraIntegration: {
+          bsonType: 'object',
+          properties: {
+            enabled: {
+              bsonType: 'bool',
+              description: 'must be a boolean'
+            },
+            projectKey: {
+              bsonType: 'string',
+              description: 'must be a string'
+            },
+            projectId: {
+              bsonType: 'string',
+              description: 'must be a string'
+            },
+            projectName: {
+              bsonType: 'string',
+              description: 'must be a string'
+            },
+            lastSyncDate: {
+              bsonType: 'string',
+              description: 'must be a string if present'
+            },
+            syncEnabled: {
+              bsonType: 'bool',
+              description: 'must be a boolean'
+            },
+            issueMapping: {
+              bsonType: 'object',
+              description: 'maps project task IDs to JIRA issue keys',
+              additionalProperties: {
+                bsonType: 'string'
+              }
+            },
+            statusMapping: {
+              bsonType: 'object',
+              description: 'maps project statuses to JIRA statuses',
+              additionalProperties: {
+                bsonType: 'string'
+              }
             }
           }
         },
