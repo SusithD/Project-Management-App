@@ -6,7 +6,8 @@ import type {
   JiraCreateIssueRequest, 
   JiraTransition, 
   JiraSearchResult,
-  JiraUser 
+  JiraUser,
+  JiraWebhookConfig 
 } from '~/types/jira';
 
 export class JiraClient {
@@ -219,6 +220,66 @@ export class JiraClient {
   // Get user by account ID
   async getUser(accountId: string): Promise<JiraUser> {
     const response = await this.client.get(`/user?accountId=${accountId}`);
+    return response.data;
+  }
+
+  // Webhook Management
+  async createWebhook(webhookConfig: Omit<JiraWebhookConfig, 'id'>): Promise<JiraWebhookConfig> {
+    const response = await this.client.post('/webhook', webhookConfig);
+    return response.data;
+  }
+
+  async getWebhooks(): Promise<JiraWebhookConfig[]> {
+    const response = await this.client.get('/webhook');
+    return response.data;
+  }
+
+  async deleteWebhook(webhookId: string): Promise<void> {
+    await this.client.delete(`/webhook/${webhookId}`);
+  }
+
+  // Bi-directional Sync Methods
+  async getIssueHistory(issueKey: string): Promise<any> {
+    const response = await this.client.get(`/issue/${issueKey}?expand=changelog`);
+    return response.data.changelog;
+  }
+
+  async getIssueLastUpdated(issueKey: string): Promise<string> {
+    const issue = await this.getIssue(issueKey);
+    return issue.fields.updated;
+  }
+
+  // Advanced Search with custom fields
+  async searchIssuesAdvanced(jql: string, fields: string[] = [], expand: string[] = []): Promise<JiraSearchResult> {
+    const response = await this.client.post('/search', {
+      jql,
+      fields: fields.length > 0 ? fields : [
+        'summary',
+        'description', 
+        'status',
+        'priority',
+        'assignee',
+        'reporter',
+        'created',
+        'updated',
+        'duedate',
+        'project',
+        'issuetype'
+      ],
+      expand: expand.join(','),
+      maxResults: 1000
+    });
+    return response.data;
+  }
+
+  // Bulk update issues
+  async bulkUpdateIssues(issueUpdates: Array<{issueKey: string, fields: any}>): Promise<any> {
+    const response = await this.client.post('/issue/bulk', {
+      issueUpdates: issueUpdates.map(update => ({
+        key: update.issueKey,
+        fields: update.fields
+      }))
+    });
     return response.data;
   }
 }
