@@ -354,94 +354,189 @@ export async function applySyncResolution(
  * Generate JIRA reports and metrics
  */
 export async function generateJiraReportMetrics(projectKey: string): Promise<JiraReportMetrics> {
-  const client = getJiraClient();
-  
-  // Fetch all issues for the project
-  const jql = `project = "${projectKey}" ORDER BY created DESC`;
-  const searchResult = await client.searchIssuesAdvanced(jql, [], ['changelog']);
-  const issues = searchResult.issues;
-  
-  // Calculate metrics
-  const totalIssues = issues.length;
-  
-  // Issues by status
-  const issuesByStatus: Record<string, number> = {};
-  issues.forEach(issue => {
-    const status = issue.fields.status.name;
-    issuesByStatus[status] = (issuesByStatus[status] || 0) + 1;
-  });
-  
-  // Issues by priority
-  const issuesByPriority: Record<string, number> = {};
-  issues.forEach(issue => {
-    const priority = issue.fields.priority.name;
-    issuesByPriority[priority] = (issuesByPriority[priority] || 0) + 1;
-  });
-  
-  // Issues by type
-  const issuesByType: Record<string, number> = {};
-  issues.forEach(issue => {
-    const type = issue.fields.issuetype.name;
-    issuesByType[type] = (issuesByType[type] || 0) + 1;
-  });
-  
-  // Calculate average resolution time (for completed issues)
-  const completedIssues = issues.filter(issue => 
-    issue.fields.status.statusCategory.key === 'done'
-  );
-  
-  let totalResolutionTime = 0;
-  completedIssues.forEach(issue => {
-    const created = new Date(issue.fields.created);
-    const updated = new Date(issue.fields.updated);
-    totalResolutionTime += updated.getTime() - created.getTime();
-  });
-  
-  const averageResolutionTime = completedIssues.length > 0 
-    ? totalResolutionTime / completedIssues.length / (1000 * 60 * 60 * 24) // Convert to days
-    : 0;
-  
-  // Calculate velocity (issues completed in last 30 days)
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
-  const recentCompletedIssues = completedIssues.filter(issue => 
-    new Date(issue.fields.updated) > thirtyDaysAgo
-  );
-  
-  const velocity = {
-    current: recentCompletedIssues.length,
-    trend: 0 // Could be calculated by comparing with previous periods
-  };
-  
-  // Generate burndown data (last 30 days)
-  const burndown: Array<{date: string, remaining: number, completed: number}> = [];
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
+  try {
+    console.log(`[JIRA Metrics] Starting metrics generation for project: "${projectKey}"`);
     
-    const completedByDate = issues.filter(issue => {
-      const updated = new Date(issue.fields.updated);
-      return updated <= date && issue.fields.status.statusCategory.key === 'done';
-    }).length;
+    const client = getJiraClient();
     
-    const remaining = totalIssues - completedByDate;
+    // Validate project key format
+    if (!projectKey || typeof projectKey !== 'string') {
+      throw new Error('Invalid project key provided');
+    }
     
-    burndown.push({
-      date: dateStr,
-      remaining,
-      completed: completedByDate
+    // Clean project key (remove any quotes or special chars that might cause issues)
+    const cleanProjectKey = projectKey.trim().replace(/['"]/g, '');
+    
+    console.log(`[JIRA Metrics] Cleaned project key: "${cleanProjectKey}"`);
+    
+    // First, let's test if we can access the project directly
+    try {
+      console.log(`[JIRA Metrics] Testing project access...`);
+      const project = await client.getProject(cleanProjectKey);
+      console.log(`[JIRA Metrics] Project found: ${project.name} (${project.key})`);
+    } catch (projectError: unknown) {
+      console.error(`[JIRA Metrics] Failed to access project directly:`, projectError instanceof Error ? projectError.message : String(projectError));
+      throw new Error(`Cannot access JIRA project "${cleanProjectKey}": ${projectError instanceof Error ? projectError.message : String(projectError)}`);
+    }
+    
+    // Use the simpler searchIssues method instead of searchIssuesAdvanced
+    console.log(`[JIRA Metrics] Fetching project issues using simple search...`);
+    let jql = `project = "${cleanProjectKey}" ORDER BY created DESC`;
+    let searchResult;
+    
+    try {
+      // Try with quotes first
+      console.log(`[JIRA Metrics] Trying JQL with quotes: ${jql}`);
+      searchResult = await client.searchIssues(jql, 0, 1000); // Use higher limit since we're not using advanced search
+      console.log(`[JIRA Metrics] JQL with quotes succeeded: ${searchResult.total} issues found`);
+    } catch (quotedError: unknown) {
+      console.warn(`[JIRA Metrics] JQL with quotes failed:`, quotedError instanceof Error ? quotedError.message : String(quotedError));
+      
+      // Try without quotes
+      jql = `project = ${cleanProjectKey} ORDER BY created DESC`;
+      console.log(`[JIRA Metrics] Trying JQL without quotes: ${jql}`);
+      try {
+        searchResult = await client.searchIssues(jql, 0, 1000);
+        console.log(`[JIRA Metrics] JQL without quotes succeeded: ${searchResult.total} issues found`);
+      } catch (unquotedError: unknown) {
+        console.error(`[JIRA Metrics] Both JQL formats failed:`, unquotedError instanceof Error ? unquotedError.message : String(unquotedError));
+        throw new Error(`Cannot query JIRA project issues: ${unquotedError instanceof Error ? unquotedError.message : String(unquotedError)}`);
+      }
+    }
+    
+    const issues = searchResult.issues;
+    console.log(`[JIRA Metrics] Found ${issues.length} total issues`);
+    
+    // Initialize default metrics structure
+    const defaultMetrics = {
+      totalIssues: 0,
+      issuesByStatus: {},
+      issuesByPriority: {},
+      issuesByType: {},
+      averageResolutionTime: 0,
+      velocity: { current: 0, trend: 0 },
+      burndown: []
+    };
+    
+    if (issues.length === 0) {
+      console.log(`[JIRA Metrics] No issues found, returning default metrics`);
+      return defaultMetrics;
+    }
+    
+    // Calculate metrics
+    const totalIssues = issues.length;
+    
+    // Issues by status
+    const issuesByStatus: Record<string, number> = {};
+    issues.forEach(issue => {
+      const status = issue.fields.status?.name || 'Unknown';
+      issuesByStatus[status] = (issuesByStatus[status] || 0) + 1;
     });
+    
+    // Issues by priority
+    const issuesByPriority: Record<string, number> = {};
+    issues.forEach(issue => {
+      const priority = issue.fields.priority?.name || 'None';
+      issuesByPriority[priority] = (issuesByPriority[priority] || 0) + 1;
+    });
+    
+    // Issues by type
+    const issuesByType: Record<string, number> = {};
+    issues.forEach(issue => {
+      const type = issue.fields.issuetype?.name || 'Unknown';
+      issuesByType[type] = (issuesByType[type] || 0) + 1;
+    });
+    
+    // Calculate average resolution time (for completed issues)
+    const completedIssues = issues.filter(issue => 
+      issue.fields.status?.statusCategory?.key === 'done'
+    );
+    
+    let totalResolutionTime = 0;
+    let validResolutionCount = 0;
+    
+    completedIssues.forEach(issue => {
+      try {
+        const created = new Date(issue.fields.created);
+        const updated = new Date(issue.fields.updated);
+        if (!isNaN(created.getTime()) && !isNaN(updated.getTime())) {
+          totalResolutionTime += updated.getTime() - created.getTime();
+          validResolutionCount++;
+        }
+      } catch (e) {
+        console.warn(`[JIRA Metrics] Invalid date format for issue ${issue.key}`);
+      }
+    });
+    
+    const averageResolutionTime = validResolutionCount > 0 
+      ? totalResolutionTime / validResolutionCount / (1000 * 60 * 60 * 24) // Convert to days
+      : 0;
+    
+    // Calculate velocity (issues completed in last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentCompletedIssues = completedIssues.filter(issue => {
+      try {
+        return new Date(issue.fields.updated) > thirtyDaysAgo;
+      } catch (e) {
+        return false;
+      }
+    });
+    
+    const velocity = {
+      current: recentCompletedIssues.length,
+      trend: 0 // Could be calculated by comparing with previous periods
+    };
+    
+    // Generate burndown data (last 30 days)
+    const burndown: Array<{date: string, remaining: number, completed: number}> = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const completedByDate = issues.filter(issue => {
+        try {
+          const updated = new Date(issue.fields.updated);
+          return updated <= date && issue.fields.status?.statusCategory?.key === 'done';
+        } catch (e) {
+          return false;
+        }
+      }).length;
+      
+      const remaining = totalIssues - completedByDate;
+      
+      burndown.push({
+        date: dateStr,
+        remaining,
+        completed: completedByDate
+      });
+    }
+    
+    console.log(`[JIRA Metrics] Metrics generated successfully: ${totalIssues} total issues, ${completedIssues.length} completed`);
+    
+    return {
+      totalIssues,
+      issuesByStatus,
+      issuesByPriority,
+      issuesByType,
+      averageResolutionTime,
+      velocity,
+      burndown
+    };
+  } catch (error) {
+    console.error('[JIRA Metrics] Detailed error generating metrics:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      projectKey
+    });
+    
+    // Return a more descriptive error
+    const errorMessage = error instanceof Error && error.message.includes('JIRA API error') 
+      ? error.message 
+      : `JIRA API error: ${error instanceof Error ? error.message : String(error)}`;
+    
+    throw new Error(errorMessage);
   }
-  
-  return {
-    totalIssues,
-    issuesByStatus,
-    issuesByPriority,
-    issuesByType,
-    averageResolutionTime,
-    velocity,
-    burndown
-  };
 }

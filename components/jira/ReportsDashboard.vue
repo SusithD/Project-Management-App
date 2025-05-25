@@ -265,18 +265,52 @@ const refreshReports = async () => {
   
   loading.value = true;
   try {
+    console.log('[Reports Dashboard] Fetching reports for project:', props.project._id || props.project.id);
+    
     const response = await fetch(`/api/jira/reports?projectId=${props.project._id || props.project.id}&includeMetrics=true`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
     const data = await response.json();
+    console.log('[Reports Dashboard] API response:', data);
     
     if (data.body?.success) {
       reportData.value = data.body.data;
       notificationsStore.success('Reports refreshed successfully');
     } else {
-      throw new Error(data.body?.message || 'Failed to load reports');
+      // Log detailed error information
+      console.error('[Reports Dashboard] API returned error:', data.body);
+      
+      const errorMessage = data.body?.message || 'Failed to load reports';
+      const errorDetails = data.body?.details;
+      
+      if (errorDetails && process.env.NODE_ENV === 'development') {
+        console.error('[Reports Dashboard] Error details:', errorDetails);
+      }
+      
+      throw new Error(errorMessage);
     }
   } catch (error) {
     console.error('Error loading reports:', error);
-    notificationsStore.error('Failed to load JIRA reports');
+    
+    // Provide more specific error messages based on the error type
+    let userMessage = 'Failed to load JIRA reports';
+    
+    if (error.message.includes('authentication')) {
+      userMessage = 'JIRA authentication failed. Please check your credentials in settings.';
+    } else if (error.message.includes('project not found') || error.message.includes('Cannot access JIRA project')) {
+      userMessage = `JIRA project "${props.project.jiraIntegration?.projectKey}" not found or inaccessible.`;
+    } else if (error.message.includes('Invalid request payload')) {
+      userMessage = 'JIRA API request format error. The project key might be invalid.';
+    } else if (error.message.includes('rate limit')) {
+      userMessage = 'JIRA rate limit exceeded. Please try again in a few minutes.';
+    } else if (error.message.includes('network') || error.message.includes('connect')) {
+      userMessage = 'Unable to connect to JIRA. Please check your network connection.';
+    }
+    
+    notificationsStore.error(userMessage);
   } finally {
     loading.value = false;
   }

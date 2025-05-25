@@ -17,7 +17,10 @@ export default defineEventHandler(async (event) => {
     const projectId = query.projectId as string;
     const includeMetrics = query.includeMetrics === 'true';
     
+    console.log(`[JIRA Reports API] Received request:`, { projectKey, projectId, includeMetrics });
+    
     if (!projectKey && !projectId) {
+      console.error('[JIRA Reports API] Missing required parameters');
       return {
         statusCode: 400,
         body: {
@@ -27,13 +30,14 @@ export default defineEventHandler(async (event) => {
       };
     }
     
-    console.log(`[JIRA API] Generating reports for ${projectKey || projectId}`);
+    console.log(`[JIRA Reports API] Generating reports for ${projectKey || projectId}`);
     
     let finalProjectKey = projectKey;
     let projectName = '';
     
     // If projectId is provided, get the JIRA project key from database
     if (projectId && !projectKey) {
+      console.log(`[JIRA Reports API] Looking up project in database: ${projectId}`);
       const { db } = await connectToDatabase();
       const projectsCollection = db.collection(COLLECTIONS.PROJECTS);
       
@@ -51,9 +55,12 @@ export default defineEventHandler(async (event) => {
         ];
       }
       
+      console.log(`[JIRA Reports API] Database query:`, JSON.stringify(projectQuery, null, 2));
       const project = await projectsCollection.findOne(projectQuery);
+      console.log(`[JIRA Reports API] Found project:`, project ? `${project.name} (${project.jiraIntegration?.projectKey})` : 'null');
       
       if (!project?.jiraIntegration?.projectKey) {
+        console.error('[JIRA Reports API] Project not found or not linked to JIRA');
         return {
           statusCode: 404,
           body: {
@@ -65,7 +72,22 @@ export default defineEventHandler(async (event) => {
       
       finalProjectKey = project.jiraIntegration.projectKey;
       projectName = project.name;
+      console.log(`[JIRA Reports API] Using project key: ${finalProjectKey}`);
     }
+    
+    // Validate project key format
+    if (!finalProjectKey || typeof finalProjectKey !== 'string' || finalProjectKey.trim() === '') {
+      console.error('[JIRA Reports API] Invalid project key:', finalProjectKey);
+      return {
+        statusCode: 400,
+        body: {
+          success: false,
+          message: 'Invalid project key format'
+        }
+      };
+    }
+    
+    console.log(`[JIRA Reports API] About to generate metrics for project key: "${finalProjectKey}"`);
     
     // Generate metrics
     const metrics = await generateJiraReportMetrics(finalProjectKey);
@@ -127,13 +149,18 @@ export default defineEventHandler(async (event) => {
       }
     };
     
-  } catch (error) {
-    console.error('[JIRA API] Error generating reports:', error);
+  } catch (error: unknown) {
+    console.error('[JIRA Reports API] Detailed error:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : 'Unknown'
+    });
     return {
       statusCode: 500,
       body: {
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to generate JIRA reports'
+        message: error instanceof Error ? error.message : 'Failed to generate JIRA reports',
+        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : String(error)) : undefined
       }
     };
   }

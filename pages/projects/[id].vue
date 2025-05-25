@@ -9,6 +9,7 @@ import { useUsersStore } from '~/stores/users'; // Add this line to import users
 import UserSelect from '~/components/common/UserSelect.vue';
 import JiraProjectLinker from '~/components/jira/ProjectLinker.vue';
 import JiraIssuesDashboard from '~/components/jira/IssuesDashboard.vue';
+import JiraReportsDashboard from '~/components/jira/ReportsDashboard.vue';
 
 // Define layout
 definePageMeta({
@@ -2064,12 +2065,25 @@ onUnmounted(() => {
             :class="[
               'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
               activeTab === 'jira-issues' 
-                ? 'border-primary-600 text-primary-600' 
+                ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
           >
             <span class="mdi mdi-jira mr-1"></span>
             Jira Issues
+          </button>
+          <button 
+            v-if="jiraIntegrationActive"
+            @click="activeTab = 'jira-reports'"
+            :class="[
+              'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
+              activeTab === 'jira-reports' 
+                ? 'border-green-500 text-green-600'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            ]"
+          >
+            <span class="mdi mdi-chart-line mr-1"></span>
+            Jira Reports
           </button>
           <button 
             @click="activeTab = 'updates'"
@@ -2513,7 +2527,10 @@ onUnmounted(() => {
                     {{ isOverdue ? 'Days Overdue' : 'Days Remaining' }}
                   </div>
                 </div>
-                <div class="text-xs text-neutral-500 mt-2">Pending: {{ project.pendingDays || 0 }} days</div>
+                <div class="text-xs text-neutral-500 mt-2">
+                  <span class="mdi mdi-information-outline mr-1"></span>
+                  Pending: {{ project.pendingDays || 0 }} days
+                </div>
               </div>
             </div>
           </div>
@@ -2861,7 +2878,7 @@ onUnmounted(() => {
                 <div class="ml-4">
                   <h4 class="font-medium text-neutral-900">{{ getUserName(project.assignedTo) || 'No project lead assigned' }}</h4>
                   <div class="flex items-center mt-1">
-                    <span class="bg-primary-100 text-primary-800 text-xs px-2 py-0.5 rounded-full">Project Lead</span>
+                    <span class="bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded-full">Project Lead</span>
                   </div>
                   <p class="text-sm text-neutral-500 mt-2">
                     <span class="mdi mdi-check-decagram text-primary-500 mr-1"></span>
@@ -2880,7 +2897,7 @@ onUnmounted(() => {
                 <div class="ml-4">
                   <h4 class="font-medium text-neutral-900">{{ getUserName(project.responsiblePerson) || 'Not assigned' }}</h4>
                   <div class="flex items-center mt-1">
-                    <span class="bg-accent-100 text-accent-800 text-xs px-2 py-0.5 rounded-full">Responsible Person</span>
+                    <span class="bg-accent-100 text-accent-800 text-xs px-2 py-1 rounded-full">Responsible Person</span>
                   </div>
                   <p class="text-sm text-neutral-500 mt-2">
                     <span class="mdi mdi-clipboard-check text-accent-500 mr-1"></span>
@@ -3133,39 +3150,35 @@ onUnmounted(() => {
                 <span class="mdi mdi-jira text-2xl text-blue-600"></span>
               </div>
               <div>
-                <h2 class="text-lg font-semibold text-neutral-800">Jira Integration</h2>
-                <p class="text-sm text-neutral-600">
-                  Manage Jira project integration
-                </p>
+                <h2 class="text-lg font-medium text-neutral-900">Jira Issues</h2>
+                <p class="text-sm text-neutral-600">Track and manage issues from your connected Jira project</p>
               </div>
             </div
             
             <!-- Integration Status Badge -->
             <div class="flex items-center space-x-3">
               <span v-if="project?.jiraIntegration?.projectKey" 
-                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">
-                <span class="w-2 h-2 bg-success-500 rounded-full mr-2"></span>
-                Connected
+                    class="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                <span class="mdi mdi-check-circle mr-1"></span>
+                Reports Active
               </span>
               <span v-else 
-                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-warning-100 text-warning-800">
-                <span class="w-2 h-2 bg-warning-500 rounded-full mr-2"></span>
-                Not Connected
+                    class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                <span class="mdi mdi-alert-circle mr-1"></span>
+                Reports Unavailable
               </span>
             </div>
           </div>
           
-          <!-- Quick Actions Row -->
+          <!-- Quick Info Row -->
           <div class="flex items-center justify-between bg-neutral-50 rounded-lg p-4">
             <div class="flex items-center space-x-4">
               <div class="text-sm">
-                <span class="font-medium text-neutral-700">Project Key:</span>
-                <span class="ml-2 font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                  {{ project?.jiraIntegration?.projectKey || 'Not Set' }}
-                </span>
+                <span class="font-medium">Project Key:</span> 
+                {{ project?.jiraIntegration?.projectKey || 'Not set' }}
               </div>
               <div v-if="project?.jiraIntegration?.lastSyncDate" class="text-sm text-neutral-600">
-                <span class="font-medium">Last Sync:</span>
+                <span class="font-medium">Last Updated:</span> 
                 {{ formatTimeAgo(project.jiraIntegration.lastSyncDate) }}
               </div>
             </div>
@@ -3174,9 +3187,9 @@ onUnmounted(() => {
               <button v-if="project?.jiraIntegration?.projectKey"
                       @click="syncJiraProject"
                       :disabled="isSyncing"
-                      class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
-                <span v-if="isSyncing" class="mdi mdi-loading mdi-spin text-base mr-1"></span>
-                <span v-else class="mdi mdi-sync text-base mr-1"></span>
+                      class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 focus:outline-none"
+              >
+                <span :class="['mdi mr-2', isSyncing ? 'mdi-loading mdi-spin' : 'mdi-refresh']"></span>
                 {{ isSyncing ? 'Syncing...' : 'Sync Now' }}
               </button>
               
@@ -3184,7 +3197,7 @@ onUnmounted(() => {
                       v-if="project?.jiraIntegration?.projectKey"
                       class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 focus:outline-none"
               >
-                <span class="mdi mdi-open-in-new text-base mr-1"></span>
+                <span class="mdi mdi-open-in-new mr-2"></span>
                 Open in Jira
               </button>
             </div>
@@ -3224,6 +3237,100 @@ onUnmounted(() => {
             <p>Need help? Check out our 
               <a href="#" class="text-blue-600 hover:text-blue-700 underline">integration guide</a>
             </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Jira Reports Tab -->
+      <div v-if="activeTab === 'jira-reports'" class="space-y-6">
+        <!-- Jira Reports Integration Status Header -->
+        <div class="bg-white rounded-lg shadow-card p-6 border-l-4 border-green-500">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center">
+              <div class="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center mr-3">
+                <span class="mdi mdi-chart-line text-2xl text-green-600"></span>
+              </div>
+              <div>
+                <h2 class="text-lg font-medium text-neutral-900">Jira Reports & Analytics</h2>
+                <p class="text-sm text-neutral-600">Comprehensive metrics and insights from your Jira project</p>
+              </div>
+            </div>
+            
+            <!-- Integration Status Badge -->
+            <div class="flex items-center space-x-3">
+              <span v-if="project?.jiraIntegration?.projectKey" 
+                    class="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                <span class="mdi mdi-check-circle mr-1"></span>
+                Reports Active
+              </span>
+              <span v-else 
+                    class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                <span class="mdi mdi-alert-circle mr-1"></span>
+                Reports Unavailable
+              </span>
+            </div>
+          </div>
+          
+          <!-- Quick Info Row -->
+          <div class="flex items-center justify-between bg-neutral-50 rounded-lg p-4">
+            <div class="flex items-center space-x-4">
+              <div class="text-sm">
+                <span class="font-medium">Data Source:</span> 
+                {{ project?.jiraIntegration?.projectKey || 'No Jira connection' }}
+              </div>
+              <div v-if="project?.jiraIntegration?.lastSyncDate" class="text-sm text-neutral-600">
+                <span class="font-medium">Last Updated:</span> 
+                {{ formatTimeAgo(project.jiraIntegration.lastSyncDate) }}
+              </div>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+              <button v-if="project?.jiraIntegration?.projectKey"
+                      @click="syncJiraProject"
+                      :disabled="isSyncing"
+                      class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-green-300 text-green-700 bg-white hover:bg-green-50 focus:outline-none"
+              >
+                <span :class="['mdi mr-2', isSyncing ? 'mdi-loading mdi-spin' : 'mdi-refresh']"></span>
+                {{ isSyncing ? 'Refreshing...' : 'Refresh Data' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Jira Reports Dashboard - Only show if connected -->
+        <div v-if="jiraIntegrationActive">
+          <JiraReportsDashboard 
+            :project="project"
+          />
+        </div>
+
+        <!-- No Jira Integration State for Reports -->
+        <div v-else class="bg-white rounded-lg shadow-card p-8 text-center">
+          <div class="h-20 w-20 rounded-full bg-green-100 mx-auto flex items-center justify-center mb-4">
+            <span class="mdi mdi-chart-line text-4xl text-green-600"></span>
+          </div>
+          <h3 class="text-lg font-medium text-neutral-900 mb-2">Connect to Jira for Reports</h3>
+          <p class="text-neutral-600 mb-6 max-w-md mx-auto">
+            To view comprehensive reports and analytics, you need to connect this project to Jira first. 
+            Once connected, you'll get detailed insights including burndown charts, velocity metrics, and issue analytics.
+          </p>
+          
+          <!-- Link to Overview tab where JiraProjectLinker is -->
+          <button @click="activeTab = 'overview'"
+                  class="inline-flex items-center px-6 py-3 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 shadow-sm"
+          >
+            <span class="mdi mdi-link-variant text-base mr-2"></span>
+            Set Up Jira Integration
+          </button>
+          
+          <div class="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
+            <h4 class="text-sm font-medium text-green-800 mb-2">Reports will include:</h4>
+            <ul class="text-sm text-green-700 space-y-1">
+              <li>• Issue completion metrics and burndown charts</li>
+              <li>• Team velocity and productivity insights</li>
+              <li>• Sprint progress and timeline analysis</li>
+              <li>• Export capabilities for presentations and stakeholders</li>
+            </ul>
           </div>
         </div>
       </div>

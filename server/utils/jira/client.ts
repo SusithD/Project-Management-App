@@ -142,7 +142,7 @@ export class JiraClient {
 
   // Get issues for a specific project
   async getProjectIssues(projectKey: string, maxResults: number = 100): Promise<JiraIssue[]> {
-    const jql = `project = "${projectKey}" ORDER BY created DESC`;
+    const jql = `project = ${projectKey} ORDER BY created DESC`;
     const result = await this.searchIssues(jql, 0, maxResults);
     return result.issues;
   }
@@ -251,8 +251,11 @@ export class JiraClient {
 
   // Advanced Search with custom fields
   async searchIssuesAdvanced(jql: string, fields: string[] = [], expand: string[] = []): Promise<JiraSearchResult> {
-    const response = await this.client.post('/search', {
-      jql,
+    // Create a clean request body with only valid parameters
+    const requestBody: any = {
+      jql: jql.trim(),
+      startAt: 0,
+      maxResults: 100, // Further reduced to be very conservative
       fields: fields.length > 0 ? fields : [
         'summary',
         'description', 
@@ -265,11 +268,24 @@ export class JiraClient {
         'duedate',
         'project',
         'issuetype'
-      ],
-      expand: expand.join(','),
-      maxResults: 1000
-    });
-    return response.data;
+      ]
+    };
+
+    // Only add expand if there are valid items to expand and it's not empty
+    if (expand.length > 0 && expand.some(item => item && item.trim())) {
+      requestBody.expand = expand.filter(item => item && item.trim()).join(',');
+    }
+
+    console.log(`[JIRA Client] Advanced search request body:`, JSON.stringify(requestBody, null, 2));
+
+    try {
+      const response = await this.client.post('/search', requestBody);
+      console.log(`[JIRA Client] Advanced search successful: ${response.data.total} total issues`);
+      return response.data;
+    } catch (error) {
+      console.error(`[JIRA Client] Advanced search failed with payload:`, requestBody);
+      throw error;
+    }
   }
 
   // Bulk update issues
