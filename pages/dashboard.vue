@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
 import { useProjectsStore } from '~/stores/projects';
 import { useRouter } from 'vue-router';
 import NewProjectModal from '~/components/projects/NewProjectModal.vue';
@@ -21,6 +21,13 @@ const selectedTab = ref('ongoing');
 const searchQuery = ref('');
 const isLoading = ref(true);
 
+// Add new filter states
+const statusFilter = ref('all');
+const priorityFilter = ref('all');
+const assigneeFilter = ref('all');
+const dateRangeFilter = ref('all');
+const showAdvancedFilters = ref(false);
+
 // Fetch projects on component mount
 onMounted(async () => {
   isLoading.value = true;
@@ -31,23 +38,71 @@ onMounted(async () => {
   initializeCharts();
 });
 
-// Filter projects by status
+// Enhanced filtering with multiple criteria
+const filteredProjects = computed(() => {
+  let filtered = projectsStore.projects;
+  
+  // Text search
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase();
+    filtered = filtered.filter(p => 
+      p.name.toLowerCase().includes(query) ||
+      p.description?.toLowerCase().includes(query) ||
+      p.assignedTo?.toLowerCase().includes(query)
+    );
+  }
+  
+  // Status filter
+  if (statusFilter.value !== 'all') {
+    filtered = filtered.filter(p => p.status === statusFilter.value);
+  }
+  
+  // Priority filter
+  if (priorityFilter.value !== 'all') {
+    filtered = filtered.filter(p => p.priority === priorityFilter.value);
+  }
+  
+  // Assignee filter
+  if (assigneeFilter.value !== 'all') {
+    filtered = filtered.filter(p => p.assignedTo === assigneeFilter.value);
+  }
+  
+  // Date range filter
+  if (dateRangeFilter.value !== 'all') {
+    const now = new Date();
+    const filterDate = new Date();
+    
+    switch (dateRangeFilter.value) {
+      case 'week':
+        filterDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        filterDate.setMonth(now.getMonth() - 1);
+        break;
+      case 'quarter':
+        filterDate.setMonth(now.getMonth() - 3);
+        break;
+    }
+    
+    filtered = filtered.filter(p => 
+      new Date(p.lastUpdated || p.startDate) >= filterDate
+    );
+  }
+  
+  return filtered;
+});
+
+// Update existing computed properties to use filtered projects
 const ongoingProjects = computed(() => 
-  projectsStore.projects
-    .filter(p => p.status === 'Ongoing')
-    .filter(p => p.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
+  filteredProjects.value.filter(p => p.status === 'Ongoing')
 );
 
 const completedProjects = computed(() => 
-  projectsStore.projects
-    .filter(p => p.status === 'Completed')
-    .filter(p => p.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
+  filteredProjects.value.filter(p => p.status === 'Completed')
 );
 
 const onHoldProjects = computed(() => 
-  projectsStore.projects
-    .filter(p => p.status === 'On Hold')
-    .filter(p => p.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
+  filteredProjects.value.filter(p => p.status === 'On Hold')
 );
 
 // Summary stats
@@ -93,94 +148,103 @@ const initializeCharts = () => {
   // Project status distribution chart
   const statusChartCtx = document.getElementById('statusChart');
   if (statusChartCtx) {
+    const statusChartData = {
+      labels: ['Ongoing', 'Completed', 'On Hold'],
+      datasets: [
+        {
+          data: [ongoingCount.value, completedCount.value, onHoldCount.value],
+          backgroundColor: ['#4f46e5', '#10b981', '#f59e0b'], // Colors for statuses
+          borderColor: '#ffffff',
+          borderWidth: 2,
+        },
+      ],
+    };
+
+    const statusChartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '70%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            usePointStyle: true,
+            padding: 15,
+          },
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const label = context.label || '';
+              const value = context.raw || 0;
+              return `${label}: ${value} projects`;
+            },
+          },
+        },
+      },
+    };
+
     new Chart(statusChartCtx, {
       type: 'doughnut',
-      data: {
-        labels: ['Ongoing', 'Completed', 'On Hold'],
-        datasets: [{
-          data: [ongoingCount.value, completedCount.value, onHoldCount.value],
-          backgroundColor: [
-            '#4f46e5', // primary color for ongoing
-            '#10b981', // success color for completed
-            '#f59e0b'  // warning color for on hold
-          ],
-          borderColor: '#ffffff',
-          borderWidth: 2
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '70%',
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              usePointStyle: true,
-              padding: 15
-            }
-          },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                const label = context.label || '';
-                const value = context.raw || 0;
-                return `${label}: ${value} projects`;
-              }
-            }
-          }
-        }
-      }
+      data: statusChartData,
+      options: statusChartOptions,
     });
   }
-  
-  // Progress over time chart (placeholder - would normally use real time data)
+
+  // Progress over time chart
   const progressChartCtx = document.getElementById('progressChart');
   if (progressChartCtx) {
-    new Chart(progressChartCtx, {
-      type: 'line',
-      data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        datasets: [{
+    const progressChartData = {
+      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+      datasets: [
+        {
           label: 'Completed Projects',
           data: [2, 5, 7, 12, 15, completedCount.value],
           borderColor: '#10b981',
           backgroundColor: 'rgba(16, 185, 129, 0.1)',
           fill: true,
-          tension: 0.4
-        }, {
+          tension: 0.4,
+        },
+        {
           label: 'Ongoing Projects',
           data: [4, 6, 8, 9, 10, ongoingCount.value],
           borderColor: '#4f46e5',
           backgroundColor: 'rgba(79, 70, 229, 0.1)',
           fill: true,
-          tension: 0.4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'top',
-          }
+          tension: 0.4,
         },
-        scales: {
-          y: {
-            beginAtZero: true,
-            grid: {
-              display: true,
-              color: 'rgba(0, 0, 0, 0.05)'
-            }
+      ],
+    };
+
+    const progressChartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: {
+            display: true,
+            color: 'rgba(0, 0, 0, 0.05)',
           },
-          x: {
-            grid: {
-              display: true,
-              color: 'rgba(0, 0, 0, 0.05)'
-            }
-          }
-        }
-      }
+        },
+        x: {
+          grid: {
+            display: true,
+            color: 'rgba(0, 0, 0, 0.05)',
+          },
+        },
+      },
+    };
+
+    new Chart(progressChartCtx, {
+      type: 'line',
+      data: progressChartData,
+      options: progressChartOptions,
     });
   }
 };
@@ -210,6 +274,164 @@ watch(searchQuery, () => {
   // Reinitialize charts when the data changes due to filtering
   setTimeout(initializeCharts, 100);
 });
+
+// Clear all filters function
+const clearAllFilters = () => {
+  searchQuery.value = '';
+  statusFilter.value = 'all';
+  priorityFilter.value = 'all';
+  assigneeFilter.value = 'all';
+  dateRangeFilter.value = 'all';
+  showAdvancedFilters.value = false;
+};
+
+// Export functionality
+const exportProjects = (format) => {
+  const data = filteredProjects.value;
+  const timestamp = new Date().toISOString().split('T')[0];
+  
+  if (format === 'json') {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `projects_${timestamp}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } else if (format === 'csv') {
+    const csvContent = convertToCSV(data);
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `projects_${timestamp}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+};
+
+const convertToCSV = (data) => {
+  const headers = ['Name', 'Status', 'Priority', 'Assigned To', 'Progress', 'Start Date', 'End Date'];
+  const csvRows = [headers.join(',')];
+  
+  data.forEach(project => {
+    const row = [
+      `"${project.name}"`,
+      project.status,
+      project.priority || 'Medium',
+      `"${project.assignedTo}"`,
+      project.progress || 0,
+      project.startDate,
+      project.endDate
+    ];
+    csvRows.push(row.join(','));
+  });
+  
+  return csvRows.join('\n');
+};
+
+// Advanced analytics computed properties
+const projectMetrics = computed(() => {
+  const projects = filteredProjects.value;
+  
+  // Performance metrics
+  const overdue = projects.filter(p => {
+    if (p.status === 'Completed') return false;
+    const deadline = new Date(p.endDate || p.deadline);
+    return deadline < new Date();
+  });
+  
+  const atRisk = projects.filter(p => {
+    if (p.status === 'Completed') return false;
+    const progress = p.progress || 0;
+    const daysRemaining = p.endDate ? Math.ceil((new Date(p.endDate) - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+    return progress < 50 && daysRemaining < 30;
+  });
+  
+  // Team workload
+  const teamWorkload = {};
+  projects.forEach(p => {
+    if (p.assignedTo && p.status === 'Ongoing') {
+      teamWorkload[p.assignedTo] = (teamWorkload[p.assignedTo] || 0) + 1;
+    }
+  });
+  
+  // Priority distribution
+  const priorityDistribution = {
+    High: projects.filter(p => p.priority === 'High').length,
+    Medium: projects.filter(p => p.priority === 'Medium').length,
+    Low: projects.filter(p => p.priority === 'Low').length
+  };
+  
+  return {
+    overdue: overdue.length,
+    atRisk: atRisk.length,
+    teamWorkload,
+    priorityDistribution,
+    avgProgress: projects.length ? Math.round(projects.reduce((acc, p) => acc + (p.progress || 0), 0) / projects.length) : 0
+  };
+});
+
+// Real-time updates simulation
+const lastRefresh = ref(new Date());
+const autoRefreshEnabled = ref(false);
+let refreshInterval = null;
+
+const toggleAutoRefresh = () => {
+  autoRefreshEnabled.value = !autoRefreshEnabled.value;
+  
+  if (autoRefreshEnabled.value) {
+    refreshInterval = setInterval(() => {
+      refreshData();
+    }, 30000); // Refresh every 30 seconds
+  } else if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+};
+
+const refreshData = async () => {
+  try {
+    await projectsStore.fetchProjects();
+    lastRefresh.value = new Date();
+    initializeCharts();
+  } catch (error) {
+    console.error('Error refreshing data:', error);
+  }
+};
+
+// Keyboard shortcuts
+const handleKeyPress = (event) => {
+  if (event.ctrlKey || event.metaKey) {
+    switch (event.key) {
+      case 'f':
+        event.preventDefault();
+        document.querySelector('input[placeholder*="Search"]')?.focus();
+        break;
+      case 'n':
+        event.preventDefault();
+        openNewProjectModal();
+        break;
+      case 'r':
+        event.preventDefault();
+        refreshData();
+        break;
+    }
+  }
+};
+
+// Add keyboard shortcuts on mount
+onMounted(() => {
+  document.addEventListener('keydown', handleKeyPress);
+});
+
+// Cleanup on unmount
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleKeyPress);
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+});
 </script>
 
 <template>
@@ -225,8 +447,48 @@ watch(searchQuery, () => {
       </div>
     </div>
 
+    <!-- Mobile-optimized header for smaller screens -->
+    <div class="md:hidden mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold text-neutral-900">Dashboard</h1>
+        <button 
+          @click="openNewProjectModal"
+          class="inline-flex items-center justify-center w-10 h-10 border border-transparent rounded-full shadow-sm text-white bg-primary-600 hover:bg-primary-700 transition-colors duration-300"
+        >
+          <span class="mdi mdi-plus text-xl"></span>
+        </button>
+      </div>
+      
+      <!-- Mobile Quick Stats -->
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="bg-white p-3 rounded-lg shadow-sm border border-neutral-200">
+          <div class="text-center">
+            <div class="text-2xl font-bold text-primary-600">{{ ongoingCount }}</div>
+            <div class="text-xs text-neutral-600">Ongoing</div>
+          </div>
+        </div>
+        <div class="bg-white p-3 rounded-lg shadow-sm border border-neutral-200">
+          <div class="text-center">
+            <div class="text-2xl font-bold text-success-600">{{ completedCount }}</div>
+            <div class="text-xs text-neutral-600">Completed</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Mobile Search -->
+      <div class="relative mb-4">
+        <span class="mdi mdi-magnify absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400"></span>
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search projects..."
+          class="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+        />
+      </div>
+    </div>
+
     <!-- Header with search and action buttons -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+    <div class="hidden md:flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
       <div class="flex flex-col w-full md:w-auto mb-4 md:mb-0">
         <h1 class="text-3xl font-bold text-neutral-900 mb-2">Project Dashboard</h1>
         <p class="text-neutral-600">Track and manage all your projects in one place</p>
@@ -240,6 +502,99 @@ watch(searchQuery, () => {
           <span class="mdi mdi-plus text-lg mr-2"></span>
           Add New Project
         </button>
+      </div>
+    </div>
+
+    <!-- Enhanced Search and Filter Bar -->
+    <div class="bg-white rounded-xl shadow-card p-6 mb-8">
+      <div class="flex flex-col lg:flex-row gap-4">
+        <!-- Search Input -->
+        <div class="flex-1">
+          <div class="relative">
+            <span class="mdi mdi-magnify absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 text-lg"></span>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search projects by name, description, or assignee..."
+              class="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+            />
+          </div>
+        </div>
+        
+        <!-- Quick Filters -->
+        <div class="flex flex-wrap gap-3">
+          <select 
+            v-model="statusFilter"
+            class="px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-w-[120px]"
+          >
+            <option value="all">All Status</option>
+            <option value="Ongoing">Ongoing</option>
+            <option value="Completed">Completed</option>
+            <option value="On Hold">On Hold</option>
+          </select>
+          
+          <select 
+            v-model="priorityFilter"
+            class="px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 min-w-[120px]"
+          >
+            <option value="all">All Priority</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+          
+          <button
+            @click="showAdvancedFilters = !showAdvancedFilters"
+            class="px-4 py-2 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors flex items-center"
+            :class="{ 'bg-neutral-100': showAdvancedFilters }"
+          >
+            <span class="mdi mdi-filter-variant text-lg mr-1"></span>
+            Filters
+          </button>
+        </div>
+      </div>
+      
+      <!-- Advanced Filters (Collapsible) -->
+      <transition
+        enter-active-class="transition-all duration-300 ease-out"
+        enter-from-class="opacity-0 max-h-0"
+        enter-to-class="opacity-100 max-h-32"
+        leave-active-class="transition-all duration-300 ease-in"
+        leave-from-class="opacity-100 max-h-32"
+        leave-to-class="opacity-0 max-h-0"
+      >
+        <div v-show="showAdvancedFilters" class="mt-4 pt-4 border-t border-neutral-200 overflow-hidden">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-neutral-700 mb-1">Assignee</label>
+              <select 
+                v-model="assigneeFilter"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="all">All Assignees</option>
+                <option v-for="project in projectsStore.projects" :key="project.assignedTo" :value="project.assignedTo">
+                  {{ project.assignedTo }}
+                </option>
+              </select>
+            </div>
+            
+            <div class="flex items-end">
+              <button
+                @click="clearAllFilters"
+                class="px-4 py-2 text-sm text-neutral-600 hover:text-neutral-800 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+              >
+                Clear All Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+      
+      <!-- Filter Results Summary -->
+      <div v-if="searchQuery || statusFilter !== 'all' || priorityFilter !== 'all' || assigneeFilter !== 'all'" 
+           class="mt-4 flex items-center text-sm text-neutral-600">
+        <span class="mdi mdi-information-outline mr-1"></span>
+        Showing {{ filteredProjects.length }} of {{ projectsStore.projects.length }} projects
       </div>
     </div>
     
@@ -464,5 +819,195 @@ watch(searchQuery, () => {
       :is-open="isNewProjectModalOpen" 
       @close="closeNewProjectModal"
     />
+    
+    <!-- Advanced Analytics Dashboard -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <!-- Performance Metrics -->
+      <div class="bg-white p-6 rounded-xl shadow-card">
+        <h3 class="text-lg font-semibold text-neutral-800 mb-4 flex items-center">
+          <span class="mdi mdi-chart-line mr-2 text-primary-600"></span>
+          Performance Metrics
+        </h3>
+        
+        <div class="space-y-4">
+          <div class="flex items-center justify-between p-3 bg-error-50 rounded-lg">
+            <div class="flex items-center">
+              <span class="mdi mdi-alert-circle text-error-600 text-xl mr-2"></span>
+              <span class="text-sm font-medium text-error-800">Overdue Projects</span>
+            </div>
+            <span class="text-lg font-bold text-error-700">{{ projectMetrics.overdue }}</span>
+          </div>
+          
+          <div class="flex items-center justify-between p-3 bg-warning-50 rounded-lg">
+            <div class="flex items-center">
+              <span class="mdi mdi-clock-alert text-warning-600 text-xl mr-2"></span>
+              <span class="text-sm font-medium text-warning-800">At Risk</span>
+            </div>
+            <span class="text-lg font-bold text-warning-700">{{ projectMetrics.atRisk }}</span>
+          </div>
+          
+          <div class="flex items-center justify-between p-3 bg-primary-50 rounded-lg">
+            <div class="flex items-center">
+              <span class="mdi mdi-speedometer text-primary-600 text-xl mr-2"></span>
+              <span class="text-sm font-medium text-primary-800">Avg Progress</span>
+            </div>
+            <span class="text-lg font-bold text-primary-700">{{ projectMetrics.avgProgress }}%</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Team Workload -->
+      <div class="bg-white p-6 rounded-xl shadow-card">
+        <h3 class="text-lg font-semibold text-neutral-800 mb-4 flex items-center">
+          <span class="mdi mdi-account-group mr-2 text-accent-600"></span>
+          Team Workload
+        </h3>
+        
+        <div class="space-y-3">
+          <div v-if="Object.keys(projectMetrics.teamWorkload).length === 0" class="text-center py-4">
+            <span class="mdi mdi-account-off text-3xl text-neutral-300"></span>
+            <p class="text-sm text-neutral-500 mt-2">No active assignments</p>
+          </div>
+          
+          <div v-else v-for="(count, member) in projectMetrics.teamWorkload" :key="member" 
+               class="flex items-center justify-between p-2 hover:bg-neutral-50 rounded-lg transition-colors">
+            <div class="flex items-center">
+              <div class="w-8 h-8 rounded-full bg-accent-100 flex items-center justify-center mr-3">
+                <span class="text-accent-600 text-sm font-medium">{{ member.charAt(0).toUpperCase() }}</span>
+              </div>
+              <span class="text-sm font-medium text-neutral-700 truncate">{{ member }}</span>
+            </div>
+            <div class="flex items-center">
+              <span class="text-lg font-bold text-neutral-900 mr-2">{{ count }}</span>
+              <div class="w-12 h-2 bg-neutral-200 rounded-full overflow-hidden">
+                <div class="h-full bg-accent-500 rounded-full transition-all duration-500"
+                     :style="`width: ${Math.min(count * 20, 100)}%`"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Priority Distribution -->
+      <div class="bg-white p-6 rounded-xl shadow-card">
+        <h3 class="text-lg font-semibold text-neutral-800 mb-4 flex items-center">
+          <span class="mdi mdi-flag mr-2 text-warning-600"></span>
+          Priority Distribution
+        </h3>
+        
+        <div class="space-y-3">
+          <div class="flex items-center justify-between p-3 bg-error-50 rounded-lg">
+            <div class="flex items-center">
+              <span class="w-3 h-3 bg-error-500 rounded-full mr-3"></span>
+              <span class="text-sm font-medium text-error-800">High Priority</span>
+            </div>
+            <span class="text-lg font-bold text-error-700">{{ projectMetrics.priorityDistribution.High }}</span>
+          </div>
+          
+          <div class="flex items-center justify-between p-3 bg-warning-50 rounded-lg">
+            <div class="flex items-center">
+              <span class="w-3 h-3 bg-warning-500 rounded-full mr-3"></span>
+              <span class="text-sm font-medium text-warning-800">Medium Priority</span>
+            </div>
+            <span class="text-lg font-bold text-warning-700">{{ projectMetrics.priorityDistribution.Medium }}</span>
+          </div>
+          
+          <div class="flex items-center justify-between p-3 bg-success-50 rounded-lg">
+            <div class="flex items-center">
+              <span class="w-3 h-3 bg-success-500 rounded-full mr-3"></span>
+              <span class="text-sm font-medium text-success-800">Low Priority</span>
+            </div>
+            <span class="text-lg font-bold text-success-700">{{ projectMetrics.priorityDistribution.Low }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Quick Actions and Tools -->
+    <div class="bg-white rounded-xl shadow-card p-6 mb-8">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <h3 class="text-lg font-semibold text-neutral-800 mb-4 md:mb-0 flex items-center">
+          <span class="mdi mdi-tools mr-2 text-primary-600"></span>
+          Quick Actions & Tools
+          </h3
+          </div>
+        
+        <div class="flex items-center space-x-4">
+            <!-- Auto Refresh Toggle -->
+            <div class="flex items-center">
+              <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" v-model="autoRefreshEnabled" @change="toggleAutoRefresh" class="sr-only">
+              <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+              <span class="ml-3 text-sm font-medium text-neutral-700">Auto Refresh</span>
+            </label>
+          </div>
+          
+          <!-- Last Refresh Time -->
+          <div class="text-xs text-neutral-500">
+            Last updated: {{ lastRefresh.toLocaleTimeString() }}
+          </div>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <button @click="refreshData" 
+                class="flex flex-col items-center p-4 border border-neutral-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 group">
+          <span class="mdi mdi-refresh text-2xl text-neutral-600 group-hover:text-primary-600 mb-2"></span>
+          <span class="text-sm font-medium text-neutral-700 group-hover:text-primary-700">Refresh</span>
+        </button>
+        
+        <button @click="exportProjects('json')" 
+                class="flex flex-col items-center p-4 border border-neutral-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 group">
+          <span class="mdi mdi-download text-2xl text-neutral-600 group-hover:text-primary-600 mb-2"></span>
+          <span class="text-sm font-medium text-neutral-700 group-hover:text-primary-700">Export JSON</span>
+        </button>
+        
+        <button @click="exportProjects('csv')" 
+                class="flex flex-col items-center p-4 border border-neutral-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 group">
+          <span class="mdi mdi-file-delimited text-2xl text-neutral-600 group-hover:text-primary-600 mb-2"></span>
+          <span class="text-sm font-medium text-neutral-700 group-hover:text-primary-700">Export CSV</span>
+        </button>
+        
+        <a href="/reports" 
+           class="flex flex-col items-center p-4 border border-neutral-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 group">
+          <span class="mdi mdi-chart-bar text-2xl text-neutral-600 group-hover:text-primary-600 mb-2"></span>
+          <span class="text-sm font-medium text-neutral-700 group-hover:text-primary-700">Reports</span>
+        </a>
+        
+        <a href="/settings" 
+           class="flex flex-col items-center p-4 border border-neutral-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 group">
+          <span class="mdi mdi-cog text-2xl text-neutral-600 group-hover:text-primary-600 mb-2"></span>
+          <span class="text-sm font-medium text-neutral-700 group-hover:text-primary-700">Settings</span>
+        </a>
+        
+        <a href="/users" 
+           class="flex flex-col items-center p-4 border border-neutral-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 group">
+          <span class="mdi mdi-account-multiple text-2xl text-neutral-600 group-hover:text-primary-600 mb-2"></span>
+          <span class="text-sm font-medium text-neutral-700 group-hover:text-primary-700">Team</span>
+        </a>
+      </div>
+      
+      <!-- Keyboard Shortcuts Help -->
+      <div class="mt-6 p-4 bg-neutral-50 rounded-lg">
+        <h4 class="text-sm font-medium text-neutral-700 mb-2 flex items-center">
+          <span class="mdi mdi-keyboard mr-2"></span>
+          Keyboard Shortcuts
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-neutral-600">
+          <div class="flex items-center">
+            <kbd class="px-2 py-1 bg-white border border-neutral-200 rounded text-xs mr-2">Ctrl+F</kbd>
+            <span>Focus search</span>
+          </div>
+          <div class="flex items-center">
+            <kbd class="px-2 py-1 bg-white border border-neutral-200 rounded text-xs mr-2">Ctrl+N</kbd>
+            <span>New project</span>
+          </div>
+          <div class="flex items-center">
+            <kbd class="px-2 py-1 bg-white border border-neutral-200 rounded text-xs mr-2">Ctrl+R</kbd>
+            <span>Refresh data</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
