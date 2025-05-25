@@ -691,20 +691,20 @@ const handleFileSelect = (event) => {
 
 const uploadFile = async () => {
   if (!selectedFile.value) return;
-  
+
   uploadingFile.value = true;
   uploadProgress.value = 0;
-  
+
   try {
     const formData = new FormData();
     formData.append('file', selectedFile.value);
-    
+
     const idToUse = mongoObjectId.value || project.value?._id;
-    
+
     if (!idToUse) {
       throw new Error("No valid MongoDB ID available");
     }
-    
+
     const response = await fetch(`/api/projects/${idToUse}/files`, {
       method: 'POST',
       headers: {
@@ -712,18 +712,19 @@ const uploadFile = async () => {
       },
       body: formData
     });
-    
+
     if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
+      const errorDetails = await response.text();
+      throw new Error(`Upload failed: ${response.statusText} - ${errorDetails}`);
     }
-    
+
     const data = await response.json();
-    
+
     // Add to local state
     if (!project.value.files) {
       project.value.files = [];
     }
-    
+
     project.value.files.push({
       name: selectedFile.value.name,
       size: selectedFile.value.size,
@@ -731,17 +732,17 @@ const uploadFile = async () => {
       uploadDate: new Date().toISOString().split('T')[0],
       uploadedBy: authStore.userFullName
     });
-    
+
     notificationsStore.success('File uploaded successfully');
     selectedFile.value = null;
-    
+
     // Reset file input
     if (fileInput.value) {
       fileInput.value.value = '';
     }
   } catch (err) {
     console.error('Error uploading file:', err);
-    notificationsStore.error('Failed to upload file');
+    notificationsStore.error(`Failed to upload file: ${err.message}`);
   } finally {
     uploadingFile.value = false;
     uploadProgress.value = 0;
