@@ -6,13 +6,13 @@ import { useNotificationsStore } from '~/stores/notifications';
 import ProjectForm from '~/components/projects/ProjectForm.vue';
 
 const props = defineProps({
-  isOpen: {
+  open: {
     type: Boolean,
     default: false
   }
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['update:open', 'close']);
 const projectsStore = useProjectsStore();
 const notificationsStore = useNotificationsStore();
 const router = useRouter();
@@ -25,13 +25,16 @@ const handleSubmit = async (formData) => {
   try {
     isSubmitting.value = true;
     const newProject = await projectsStore.createProject(formData);
+    
+    // Close modal
+    emit('update:open', false);
     emit('close');
     
     // Show success notification
     notificationsStore.success(`Project "${newProject.name}" created successfully`);
     
     // Navigate to the newly created project
-    router.push(`/projects/${newProject.id}`);
+    router.push(`/projects/${newProject.id || newProject._id}`);
   } catch (error) {
     console.error('Failed to create project:', error);
     notificationsStore.error('Failed to create project. Please try again.');
@@ -42,6 +45,7 @@ const handleSubmit = async (formData) => {
 
 // Handle cancel
 const handleCancel = () => {
+  emit('update:open', false);
   emit('close');
 };
 </script>
@@ -55,7 +59,7 @@ const handleCancel = () => {
     leave-from-class="opacity-100"
     leave-to-class="opacity-0"
   >
-    <div v-if="isOpen" class="fixed inset-0 z-50 overflow-y-auto">
+    <div v-if="open" class="fixed inset-0 z-50 overflow-y-auto">
       <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
         <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="handleCancel"></div>
         

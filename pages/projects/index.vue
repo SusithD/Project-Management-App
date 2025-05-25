@@ -865,7 +865,7 @@ const openNewProjectModal = () => {
 
 // Close new project modal
 const closeNewProjectModal = () => {
-  isNewProjectModal.value = false;
+  isNewProjectModalOpen.value = false;
 };
 
 // Clear all filters
@@ -1764,6 +1764,9 @@ const getJiraStatus = (project) => {
         </div>
       </div>
     </div>
+    
+    <!-- New Project Modal -->
+    <NewProjectModal v-model:open="isNewProjectModalOpen" @close="closeNewProjectModal" />
   </div>
 </template>
 
