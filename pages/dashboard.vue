@@ -816,7 +816,7 @@ onUnmounted(() => {
     
     <!-- New Project Modal -->
     <NewProjectModal 
-      :is-open="isNewProjectModalOpen" 
+      :open="isNewProjectModalOpen" 
       @close="closeNewProjectModal"
     />
     
