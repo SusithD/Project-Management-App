@@ -85,13 +85,16 @@ export default defineNuxtConfig({
     ]
   },
   
-  // SSR detection
+  // SSR configuration optimized for Vercel
   ssr: true,
+  nitro: {
+    preset: 'vercel'
+  },
   
   // Improve client/server state handling
   experimental: {
     asyncContext: true,
-    payloadExtraction: true
+    payloadExtraction: false
   },
   
   // Route middleware config to better handle auth redirects

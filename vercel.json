@@ -1,0 +1,22 @@
+{
+  "builds": [
+    {
+      "src": "nuxt.config.ts",
+      "use": "@nuxtjs/vercel-builder"
+    }
+  ],
+  "functions": {
+    "server/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/server/api/$1"
+    }
+  ],
+  "env": {
+    "NUXT_SECRET_KEY": "@nuxt_secret_key"
+  }
+}

@@ -1,0 +1,14 @@
+node_modules
+.nuxt
+.output
+.env
+.env.local
+.env.production
+dist
+uploads
+Dockerfile
+docker-compose.yml
+Makefile
+README.md
+# Vercel
+.vercel
