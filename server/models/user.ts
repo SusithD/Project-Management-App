@@ -17,8 +17,11 @@ export interface User {
     workload?: number; // Percentage (0-100) representing current workload
   };
   joinedAt?: string;
+  createdAt?: string; // When the user was created
   lastActive?: string;
+  updatedAt?: string; // When the user was last updated
   // New fields for role-based access
   permissions?: string[]; // Cached permissions for quick access
   lastRoleUpdate?: string; // When role was last updated
+  lastModifiedBy?: string; // Who last modified the user
 }

@@ -225,6 +225,11 @@ import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '~/stores/auth';
 import { ROLES } from '~/server/config/roles';
 
+// Define layout
+definePageMeta({
+  layout: 'dashboard'
+});
+
 // Auth store
 const authStore = useAuthStore();
 

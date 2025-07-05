@@ -73,7 +73,7 @@ export const ROLES: Record<string, RoleConfig> = {
 export const EMAIL_ROLE_MAPPING: Record<string, keyof typeof ROLES> = {
   // Super Admin
   'admin@coveragex.com': 'SUPER_ADMIN',
-//   'salwis@coveragex.com': 'SUPER_ADMIN',
+  'salwis@coveragex.com': 'SUPER_ADMIN',
   
   // Managers
   'manager@coveragex.com': 'MANAGER',

@@ -8,7 +8,7 @@ export default defineNuxtRouteMiddleware((to) => {
   }
 
   // Skip middleware for admin demo pages (these are for testing/debugging)
-  if (to.path.startsWith('/admin/auth-demo') || to.path.startsWith('/admin/roles')) {
+  if (to.path.startsWith('/admin/auth-demo') || to.path.startsWith('/admin/roles') || to.path.startsWith('/admin/email-mappings')) {
     return;
   }
 
