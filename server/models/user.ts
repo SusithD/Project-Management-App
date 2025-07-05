@@ -1,9 +1,11 @@
+import { ROLES } from '../config/roles';
+
 export interface User {
   _id?: any;
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: keyof typeof ROLES; // Now typed to only allow valid roles
   department?: string;
   skills?: string[];
   avatar?: string;
@@ -16,4 +18,7 @@ export interface User {
   };
   joinedAt?: string;
   lastActive?: string;
+  // New fields for role-based access
+  permissions?: string[]; // Cached permissions for quick access
+  lastRoleUpdate?: string; // When role was last updated
 }

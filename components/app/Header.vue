@@ -74,13 +74,7 @@ const notifications = [
       </button>
       
       <!-- Right Actions -->
-      <div class="flex items-center space-x-2">
-        <!-- Create Button -->
-        <!-- <button class="bg-primary-600 text-white px-4 py-2 rounded-md flex items-center shadow-sm hover:bg-primary-700 transition-colors">
-          <span class="mdi mdi-plus text-lg mr-1"></span>
-          <span class="hidden md:inline-block">New Project</span>
-        </button> -->
-        
+      <div class="flex items-center space-x-2">        
         <!-- Notifications -->
         <div class="relative">
           <button 
@@ -130,11 +124,22 @@ const notifications = [
           <!-- Profile Dropdown -->
           <div 
             v-show="isProfileOpen"
-            class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-elevated overflow-hidden z-50"
+            class="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-elevated overflow-hidden z-50"
           >
-            <div class="p-3 border-b border-neutral-200">
-              <p class="font-medium">{{ userName }}</p>
-              <p class="text-sm text-neutral-500">{{ userEmail }}</p>
+            <div class="p-4 border-b border-neutral-200">
+              <div class="flex items-center space-x-3">
+                <div class="w-12 h-12 rounded-full bg-primary-600 flex items-center justify-center text-white">
+                  <span class="mdi mdi-account text-xl"></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-medium text-gray-900 truncate">{{ userName }}</p>
+                  <p class="text-sm text-gray-500 truncate">{{ userEmail }}</p>
+                  <!-- Role Badge -->
+                  <div class="mt-2">
+                    <RoleBadge :role="authStore.role" v-if="authStore.role" />
+                  </div>
+                </div>
+              </div>
             </div>
             <ul>
               <li>
@@ -143,10 +148,22 @@ const notifications = [
                   My Profile
                 </a>
               </li>
-              <li>
+              <li v-if="authStore.canAccessResource('users')">
                 <a href="/settings" class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
                   <span class="mdi mdi-cog-outline mr-2"></span>
                   Settings
+                </a>
+              </li>
+              <li v-if="authStore.canAccessResource('users')">
+                <a href="/users" class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
+                  <span class="mdi mdi-account-group-outline mr-2"></span>
+                  User Management
+                </a>
+              </li>
+              <li v-if="authStore.canAccessResource('reports')">
+                <a href="/reports" class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
+                  <span class="mdi mdi-chart-line mr-2"></span>
+                  Reports
                 </a>
               </li>
               <li class="border-t border-neutral-200">

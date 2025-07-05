@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { ROLES } from '~/server/config/roles';
 
 export const useAuthStore = defineStore('auth', {
   state: () => {
@@ -28,6 +29,8 @@ export const useAuthStore = defineStore('auth', {
       user: savedState?.user || null,
       isAuthenticated: savedState?.isAuthenticated || false,
       role: savedState?.role || null,
+      roleName: savedState?.roleName || null,
+      permissions: savedState?.permissions || [],
       accessToken: savedState?.accessToken || null,
       idToken: savedState?.idToken || null,
       refreshToken: savedState?.refreshToken || null,
@@ -38,10 +41,15 @@ export const useAuthStore = defineStore('auth', {
   },
   
   getters: {
-    isAdmin: (state) => state.role === 'admin',
-    isBusinessAnalyst: (state) => state.role === 'business_analyst',
-    isProjectMember: (state) => state.role === 'project_member',
-    userFullName: (state) => state.user?.displayName || 'User',
+    // Role-based getters
+    isSuperAdmin: (state) => state.role === 'SUPER_ADMIN',
+    isManager: (state) => state.role === 'MANAGER',
+    isBusinessAnalyst: (state) => state.role === 'BUSINESS_ANALYST',
+    isDeveloper: (state) => state.role === 'DEVELOPER',
+    isDesigner: (state) => state.role === 'DESIGNER',
+    isHR: (state) => state.role === 'HR',
+    
+    userFullName: (state) => state.user?.displayName || state.user?.name || 'User',
     userEmail: (state) => state.user?.mail || state.user?.userPrincipalName || '',
     
     // New getter to check if the session is valid
@@ -89,43 +97,61 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     
-    // Set user and authentication details
-    setUser(userData) {
-      this.user = userData;
-      this.isAuthenticated = true;
-      
-      // Store MSAL account ID for later token extraction
-      if (userData.account) {
-        const homeAccountId = userData.account.homeAccountId || 
-                             (userData.account.localAccountId && userData.account.tenantId ? 
-                              `${userData.account.localAccountId}.${userData.account.tenantId}` : null);
-        if (homeAccountId) {
-          this.msalAccountId = homeAccountId;
+    // Set user and authentication details with role assignment
+    async setUser(userData) {
+      try {
+        // Call our backend to get proper role assignment
+        const response = await $fetch('/api/auth/user', {
+          method: 'POST',
+          body: {
+            email: userData.mail || userData.userPrincipalName,
+            name: userData.displayName || userData.name,
+            accessToken: userData.accessToken,
+            idToken: userData.idToken
+          }
+        });
+        
+        if (response.success) {
+          // Update store with backend response including role
+          this.user = userData;
+          this.isAuthenticated = true;
+          this.role = response.user.role;
+          this.roleName = response.user.roleName;
+          this.permissions = response.user.permissions;
+          
+          // Store MSAL account ID for later token extraction
+          if (userData.account) {
+            const homeAccountId = userData.account.homeAccountId || 
+                                 (userData.account.localAccountId && userData.account.tenantId ? 
+                                  `${userData.account.localAccountId}.${userData.account.tenantId}` : null);
+            if (homeAccountId) {
+              this.msalAccountId = homeAccountId;
+            }
+          } else if (userData.id && userData.tenantId) {
+            this.msalAccountId = `${userData.id}.${userData.tenantId}`;
+          }
+          
+          // Store tokens if they exist
+          this.accessToken = userData.accessToken || null;
+          this.idToken = userData.idToken || null;
+          
+          // Store refresh token from userData or try to extract from MSAL storage
+          this.refreshToken = userData.refreshToken || this.extractRefreshTokenFromMsal();
+          
+          // Set the expiry - default to 1 day if not provided
+          const expiresInMs = userData.expiresIn ? userData.expiresIn * 1000 : 24 * 60 * 60 * 1000;
+          this.expiresAt = new Date(Date.now() + expiresInMs).toISOString();
+          
+          // Set last activity timestamp
+          this.updateLastActivity();
+          
+          // Persist state to localStorage
+          this.persistState();
         }
-      } else if (userData.id && userData.tenantId) {
-        this.msalAccountId = `${userData.id}.${userData.tenantId}`;
+      } catch (error) {
+        console.error('Error setting user with role:', error);
+        throw error;
       }
-      
-      // Default role if not specified
-      this.role = userData.role || 'business_analyst';
-      
-      // Store tokens if they exist
-      this.accessToken = userData.accessToken || null;
-      this.idToken = userData.idToken || null;
-      
-      // Store refresh token from userData or try to extract from MSAL storage
-      this.refreshToken = userData.refreshToken || this.extractRefreshTokenFromMsal();
-      
-      // Set the expiry - default to 1 day if not provided
-      // In production, use the actual token expiry from the ID token claims
-      const expiresInMs = userData.expiresIn ? userData.expiresIn * 1000 : 24 * 60 * 60 * 1000;
-      this.expiresAt = new Date(Date.now() + expiresInMs).toISOString();
-      
-      // Set last activity timestamp
-      this.updateLastActivity();
-      
-      // Persist state to localStorage
-      this.persistState();
     },
     
     // Clear user and authentication details
@@ -133,6 +159,8 @@ export const useAuthStore = defineStore('auth', {
       this.user = null;
       this.isAuthenticated = false;
       this.role = null;
+      this.roleName = null;
+      this.permissions = [];
       this.accessToken = null;
       this.idToken = null;
       this.refreshToken = null;
@@ -169,6 +197,8 @@ export const useAuthStore = defineStore('auth', {
             user: this.user,
             isAuthenticated: this.isAuthenticated,
             role: this.role,
+            roleName: this.roleName,
+            permissions: this.permissions,
             accessToken: this.accessToken,
             idToken: this.idToken,
             refreshToken: this.refreshToken,
@@ -209,7 +239,7 @@ export const useAuthStore = defineStore('auth', {
           account: account
         };
         
-        this.setUser(userData);
+        await this.setUser(userData);
         return true;
       } catch (error) {
         console.error('Failed to complete authentication:', error);
@@ -219,40 +249,42 @@ export const useAuthStore = defineStore('auth', {
     },
     
     // Check if user has permission to perform an action
-    hasPermission(action, resourceId = null) {
+    hasPermission(resource, action) {
       if (!this.isAuthenticated || !this.isSessionValid) {
         return false;
       }
       
-      switch (action) {
-        case 'view_all_projects':
-          return this.isAdmin || this.isBusinessAnalyst;
-          
-        case 'edit_project':
-          // Admin and business analyst can edit any project
-          if (this.isAdmin || this.isBusinessAnalyst) return true;
-          // Project members can only edit their assigned projects
-          return this.isProjectMember && this.isAssignedToProject(resourceId);
-          
-        case 'create_project':
-          return this.isAdmin || this.isBusinessAnalyst;
-          
-        case 'delete_project':
-          return this.isAdmin;
-          
-        case 'manage_users':
-          return this.isAdmin;
-          
-        default:
-          return false;
+      // Super admin has access to everything
+      if (this.isSuperAdmin) {
+        return true;
       }
+      
+      // Check specific permissions from the role configuration
+      return this.permissions.some(permission => {
+        const resourceMatch = permission.resource === '*' || permission.resource === resource;
+        const actionMatch = permission.actions.includes('*') || permission.actions.includes(action);
+        return resourceMatch && actionMatch;
+      });
     },
     
-    // Check if user is assigned to a project
-    isAssignedToProject(projectId) {
-      // In a real app, you would check against your backend data
-      // For demo purposes, we'll return true
-      return true;
+    // Check if user can access a resource (read permission)
+    canAccessResource(resource) {
+      return this.hasPermission(resource, 'read');
+    },
+    
+    // Check if user can edit/update a resource
+    canEditResource(resource) {
+      return this.hasPermission(resource, 'update');
+    },
+    
+    // Check if user can create resources
+    canCreateResource(resource) {
+      return this.hasPermission(resource, 'create');
+    },
+    
+    // Check if user can delete resources
+    canDeleteResource(resource) {
+      return this.hasPermission(resource, 'delete');
     },
     
     // Attempt to refresh the access token

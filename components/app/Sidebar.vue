@@ -5,12 +5,11 @@ import { useAuthStore } from '~/stores/auth';
 
 const router = useRouter();
 const authStore = useAuthStore();
-const user = inject('user', ref(null)); // Provide a default value
+const user = inject('user', ref(null));
 const isMobileMenuOpen = ref(false);
 
 // Computed properties for user information
 const userName = computed(() => {
-  // First check if user exists and has a value
   if (user && user.value && user.value.name) {
     return user.value.name;
   }
@@ -18,48 +17,103 @@ const userName = computed(() => {
 });
 
 const userRole = computed(() => {
-  return authStore.role || 'User';
+  return authStore.roleName || authStore.role || 'User';
 });
 
-// Navigation items
-const navItems = [
+// Navigation items with role-based filtering
+const allNavItems = [
   { 
     label: 'Dashboard', 
     icon: 'mdi-view-dashboard-outline', 
     route: '/dashboard',
+    requiredResource: 'projects',
+    requiredAction: 'read',
     active: computed(() => router.currentRoute.value.path === '/dashboard')
   },
   { 
     label: 'Projects', 
     icon: 'mdi-folder-multiple-outline', 
     route: '/projects',
+    requiredResource: 'projects',
+    requiredAction: 'read',
     active: computed(() => router.currentRoute.value.path.startsWith('/projects'))
+  },
+  { 
+    label: 'My Tasks', 
+    icon: 'mdi-checkbox-multiple-outline', 
+    route: '/tasks',
+    requiredResource: 'tasks',
+    requiredAction: 'read',
+    active: computed(() => router.currentRoute.value.path.startsWith('/tasks'))
   },
   { 
     label: 'Users', 
     icon: 'mdi-account-group-outline', 
     route: '/users',
+    requiredResource: 'users',
+    requiredAction: 'read',
     active: computed(() => router.currentRoute.value.path.startsWith('/users'))
   },
   {
     label: 'Employee Projects',
     icon: 'mdi-account-tie',
     route: '/employees/projects',
+    requiredResource: 'projects',
+    requiredAction: 'read',
     active: computed(() => router.currentRoute.value.path.startsWith('/employees/projects'))
   },
   { 
     label: 'Reports', 
     icon: 'mdi-chart-box-outline', 
     route: '/reports',
+    requiredResource: 'reports',
+    requiredAction: 'read',
     active: computed(() => router.currentRoute.value.path.startsWith('/reports'))
   },
   { 
     label: 'Settings', 
     icon: 'mdi-cog-outline', 
     route: '/settings',
+    requiredResource: 'users',
+    requiredAction: 'update',
     active: computed(() => router.currentRoute.value.path.startsWith('/settings'))
   }
 ];
+
+// Filter navigation items based on user permissions
+const navItems = computed(() => {
+  return allNavItems.filter(item => {
+    if (!item.requiredResource || !item.requiredAction) {
+      return true; // Show items without permission requirements
+    }
+    return authStore.hasPermission(item.requiredResource, item.requiredAction);
+  });
+});
+
+// Additional workspace items with role restrictions
+const workspaceItems = computed(() => {
+  const items = [];
+  
+  if (authStore.canAccessResource('reports')) {
+    items.push({
+      label: 'Analytics',
+      icon: 'mdi-chart-line',
+      route: '/reports',
+      active: router.currentRoute.value.path.startsWith('/reports')
+    });
+  }
+  
+  if (authStore.canAccessResource('users') && (authStore.isManager || authStore.isSuperAdmin)) {
+    items.push({
+      label: 'Admin Panel',
+      icon: 'mdi-shield-crown',
+      route: '/admin',
+      active: router.currentRoute.value.path.startsWith('/admin')
+    });
+  }
+  
+  return items;
+});
 
 // Toggle mobile menu
 const toggleMobileMenu = () => {
@@ -67,7 +121,6 @@ const toggleMobileMenu = () => {
 };
 
 // Navigate to a route and close mobile menu
-// Renamed from navigateTo to navigate to avoid conflicts with Nuxt's built-in navigateTo
 const navigate = (route) => {
   router.push(route);
   isMobileMenuOpen.value = false;
@@ -75,17 +128,14 @@ const navigate = (route) => {
 
 // Handle user logout
 const handleLogout = () => {
-  // Clear user authentication data from store
   authStore.clearUser();
-  // Redirect to login page
   router.push('/login');
-  // Close mobile menu if open
   isMobileMenuOpen.value = false;
 };
 </script>
 
 <template>
-  <!-- Mobile menu button with cleaner look -->
+  <!-- Mobile menu button -->
   <button 
     @click="toggleMobileMenu" 
     class="md:hidden fixed top-4 left-4 z-50 bg-primary-600/90 hover:bg-primary-700 text-white p-2 rounded-lg shadow-md transition-all duration-200"
@@ -93,7 +143,7 @@ const handleLogout = () => {
     <span class="mdi mdi-menu text-xl"></span>
   </button>
   
-  <!-- Sidebar for desktop with modern minimal design -->
+  <!-- Sidebar for desktop -->
   <aside class="hidden md:flex flex-col w-64 bg-white dark:bg-primary-700 border-r border-gray-200 dark:border-gray-800 shadow-sm">
     <div class="p-5 flex items-center">
       <span class="mdi mdi-cube-outline text-xl mr-3 text-primary-600 dark:text-primary-400"></span>
@@ -146,55 +196,39 @@ const handleLogout = () => {
           </ul>
         </div>
         
-        <div class="px-2 py-2">
-          <div class="h-px bg-gray-100 dark:bg-gray-400"></div>
-        </div>
-        
-        <div>
-          <div class="px-4 mb-2">
-            <h2 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Workspace</h2>
+        <!-- Workspace section - only show if user has additional items -->
+        <div v-if="workspaceItems.length > 0">
+          <div class="px-2 py-2">
+            <div class="h-px bg-gray-100 dark:bg-gray-400"></div>
           </div>
           
-          <ul class="space-y-1 px-2">
-            <li>
-              <a 
-                @click.prevent="navigate('/reports')" 
-                :class="[
-                  'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
-                  router.currentRoute.value.path.startsWith('/reports')
-                    ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-primary-400'
-                ]"
-              >
-                <span 
+          <div>
+            <div class="px-4 mb-2">
+              <h2 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Workspace</h2>
+            </div>
+            
+            <ul class="space-y-1 px-2">
+              <li v-for="item in workspaceItems" :key="item.label">
+                <a 
+                  @click.prevent="navigate(item.route)" 
                   :class="[
-                    'mdi mdi-chart-line text-xl mr-3',
-                    router.currentRoute.value.path.startsWith('/reports') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'
+                    'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
+                    item.active
+                      ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium' 
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-primary-400'
                   ]"
-                ></span>
-                <span>Analytics</span>
-              </a>
-            </li>
-            <li>
-              <a 
-                @click.prevent="navigate('/settings')" 
-                :class="[
-                  'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
-                  router.currentRoute.value.path.startsWith('/settings')
-                    ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-primary-400'
-                ]"
-              >
-                <span 
-                  :class="[
-                    'mdi mdi-cog-outline text-xl mr-3',
-                    router.currentRoute.value.path.startsWith('/settings') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'
-                  ]"
-                ></span>
-                <span>Settings</span>
-              </a>
-            </li>
-          </ul>
+                >
+                  <span 
+                    :class="[
+                      `mdi ${item.icon} text-xl mr-3`,
+                      item.active ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'
+                    ]"
+                  ></span>
+                  <span>{{ item.label }}</span>
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </nav>
@@ -205,11 +239,10 @@ const handleLogout = () => {
           <span class="mdi mdi-account text-lg text-gray-600 dark:text-gray-300"></span>
         </div>
         <div class="ml-3 flex-grow">
-          <p class="text-sm font-medium text-gray-800 dark:text-white">{{ userName }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
-            <span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
-            {{ userRole }}
-          </p>
+          <p class="text-sm font-medium text-gray-800 dark:text-white truncate">{{ userName }}</p>
+          <div class="flex items-center mt-1">
+            <RoleBadge :role="authStore.role" v-if="authStore.role" />
+          </div>
         </div>
         <button 
           @click="handleLogout" 
@@ -222,7 +255,7 @@ const handleLogout = () => {
     </div>
   </aside>
   
-  <!-- Mobile sidebar with clean modern design -->
+  <!-- Mobile sidebar -->
   <aside 
     v-show="isMobileMenuOpen" 
     class="md:hidden fixed inset-0 z-40 flex flex-col w-72 bg-white dark:bg-gray-900 shadow-xl transform transition-all duration-300 ease-in-out"
@@ -283,55 +316,39 @@ const handleLogout = () => {
           </ul>
         </div>
         
-        <div class="px-2 py-2">
-          <div class="h-px bg-gray-200 dark:bg-gray-800"></div>
-        </div>
-        
-        <div>
-          <div class="px-4 mb-2">
-            <h2 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Workspace</h2>
+        <!-- Mobile workspace section -->
+        <div v-if="workspaceItems.length > 0">
+          <div class="px-2 py-2">
+            <div class="h-px bg-gray-200 dark:bg-gray-800"></div>
           </div>
           
-          <ul class="space-y-1 px-2">
-            <li>
-              <a 
-                @click.prevent="navigate('/reports')" 
-                :class="[
-                  'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
-                  router.currentRoute.value.path.startsWith('/reports')
-                    ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-primary-400'
-                ]"
-              >
-                <span 
+          <div>
+            <div class="px-4 mb-2">
+              <h2 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Workspace</h2>
+            </div>
+            
+            <ul class="space-y-1 px-2">
+              <li v-for="item in workspaceItems" :key="item.label">
+                <a 
+                  @click.prevent="navigate(item.route)" 
                   :class="[
-                    'mdi mdi-chart-line text-xl mr-3',
-                    router.currentRoute.value.path.startsWith('/reports') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'
+                    'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
+                    item.active
+                      ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium' 
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-primary-400'
                   ]"
-                ></span>
-                Analytics
-              </a>
-            </li>
-            <li>
-              <a 
-                @click.prevent="navigate('/settings')" 
-                :class="[
-                  'flex items-center px-4 py-2.5 text-sm font-medium rounded-lg cursor-pointer transition-all duration-200',
-                  router.currentRoute.value.path.startsWith('/settings')
-                    ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-primary-400'
-                ]"
-              >
-                <span 
-                  :class="[
-                    'mdi mdi-cog-outline text-xl mr-3',
-                    router.currentRoute.value.path.startsWith('/settings') ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'
-                  ]"
-                ></span>
-                Settings
-              </a>
-            </li>
-          </ul>
+                >
+                  <span 
+                    :class="[
+                      `mdi ${item.icon} text-xl mr-3`,
+                      item.active ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'
+                    ]"
+                  ></span>
+                  {{ item.label }}
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </nav>
@@ -343,10 +360,9 @@ const handleLogout = () => {
         </div>
         <div class="ml-3 flex-grow">
           <p class="text-sm font-medium text-gray-800 dark:text-white">{{ userName }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400 flex items-center">
-            <span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
-            {{ userRole }}
-          </p>
+          <div class="mt-1">
+            <RoleBadge :role="authStore.role" v-if="authStore.role" />
+          </div>
         </div>
         <button 
           @click="handleLogout" 
@@ -359,7 +375,7 @@ const handleLogout = () => {
     </div>
   </aside>
   
-  <!-- Overlay for mobile with smooth transition -->
+  <!-- Overlay for mobile -->
   <div 
     v-if="isMobileMenuOpen" 
     @click="toggleMobileMenu"
