@@ -39,6 +39,8 @@ export default defineNuxtConfig({
     // Public environment variables
     public: {
       appUrl: process.env.APP_URL || "http://localhost:3000",
+      // Demo mode configuration
+      demoMode: process.env.DEMO_MODE === "true",
       // Add Jira base URL to public config for client-side access
       jira: {
         baseUrl:
@@ -108,6 +110,7 @@ export default defineNuxtConfig({
   routeRules: {
     // Public routes
     "/login": { ssr: false },
+    "/demo-login": { ssr: false },
     "/auth/**": { ssr: false },
 
     // Protected routes that need authentication
