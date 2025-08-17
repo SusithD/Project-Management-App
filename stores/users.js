@@ -87,11 +87,21 @@ export const useUsersStore = defineStore('users', {
     // Fetch all users from the API
     async fetchUsers() {
       const notifications = useNotificationsStore();
+      const authStore = useAuthStore();
       this.loading = true;
       this.error = null;
 
       try {
-        const response = await fetch('/api/users/');
+        // Add user email for demo mode detection
+        const queryParams = new URLSearchParams();
+        if (authStore.userEmail) {
+          queryParams.append('userEmail', authStore.userEmail);
+        }
+        
+        const queryString = queryParams.toString();
+        const url = `/api/users/${queryString ? '?' + queryString : ''}`;
+        
+        const response = await fetch(url);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch users: ${response.statusText}`);
