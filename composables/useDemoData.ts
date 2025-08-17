@@ -4,12 +4,12 @@ export const useDemoData = () => {
   const DEMO_USERS = [
     {
       id: 'demo-admin-001',
-      name: 'Sarah Johnson',
-      email: 'sarah.johnson@demo.com',
+      name: 'Susith Deshan Alwis',
+      email: 'susithdeshan@demo.com',
       role: 'SUPER_ADMIN',
       department: 'IT Management',
       skills: ['Project Management', 'Leadership', 'Strategic Planning'],
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+      avatar: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=150&h=150&fit=crop&crop=face',
       availability: {
         status: 'available',
         allocatedProjects: 2,
