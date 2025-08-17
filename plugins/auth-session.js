@@ -130,9 +130,9 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     if (sessionRestored) return;
     sessionRestored = true;
     
-    // Skip if we're already handling auth (e.g., on the login or redirect page)
+    // Skip if we're already handling auth (e.g., on the login, demo-login, test pages, or redirect page)
     const route = useRoute();
-    if (route.path === '/login' || route.path === '/auth/redirect') {
+    if (route.path === '/login' || route.path === '/demo-login' || route.path === '/test-demo' || route.path === '/auth/redirect') {
       return;
     }
     
@@ -157,7 +157,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
   nuxtApp.hook('page:start', async () => {
     // Skip for auth-related pages
     const route = useRoute();
-    if (route.path === '/login' || route.path === '/auth/redirect') {
+    if (route.path === '/login' || route.path === '/demo-login' || route.path === '/test-demo' || route.path === '/auth/redirect') {
       return;
     }
     
