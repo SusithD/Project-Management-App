@@ -1,0 +1,181 @@
+{
+  "info": {
+    "name": "JIRA API Testing",
+    "description": "Postman collection for testing JIRA-related endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Issue",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic {{apiToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/rest/api/2/issue/{{issueId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "rest",
+            "api",
+            "2",
+            "issue",
+            "{{issueId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create Issue",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic {{apiToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/rest/api/2/issue",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "rest",
+            "api",
+            "2",
+            "issue"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"fields\":{\"project\":{\"key\":\"{{projectKey}}\"},\"summary\":\"Issue summary\",\"description\":\"Issue description\",\"issuetype\":{\"name\":\"Task\"}}}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Update Issue",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic {{apiToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/rest/api/2/issue/{{issueId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "rest",
+            "api",
+            "2",
+            "issue",
+            "{{issueId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"fields\":{\"summary\":\"Updated summary\"}}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Issue",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic {{apiToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/rest/api/2/issue/{{issueId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "rest",
+            "api",
+            "2",
+            "issue",
+            "{{issueId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search Issues",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic {{apiToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/rest/api/2/search",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "rest",
+            "api",
+            "2",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "jql",
+              "value": "project={{projectKey}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
