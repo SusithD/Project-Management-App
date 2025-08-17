@@ -1,4 +1,4 @@
-import { defineEventHandler } from 'h3';
+import { defineEventHandler, createError } from 'h3';
 import { getJiraClient } from '~/server/utils/jira';
 
 /**
@@ -15,28 +15,23 @@ export default defineEventHandler(async (event) => {
     
     console.log(`[JIRA API] Found ${projects.length} JIRA projects`);
     
+    // Return data directly without wrapping in body
     return {
-      statusCode: 200,
-      body: {
-        success: true,
-        projects: projects.map(project => ({
-          id: project.id,
-          key: project.key,
-          name: project.name,
-          projectTypeKey: project.projectTypeKey,
-          style: project.style,
-          isPrivate: project.isPrivate
-        }))
-      }
+      success: true,
+      projects: projects.map(project => ({
+        id: project.id,
+        key: project.key,
+        name: project.name,
+        projectTypeKey: project.projectTypeKey,
+        style: project.style,
+        isPrivate: project.isPrivate
+      }))
     };
   } catch (error) {
     console.error('[JIRA API] Error fetching JIRA projects:', error);
-    return {
+    throw createError({
       statusCode: 500,
-      body: {
-        success: false,
-        message: error instanceof Error ? error.message : 'Failed to fetch JIRA projects'
-      }
-    };
+      statusMessage: error instanceof Error ? error.message : 'Failed to fetch JIRA projects'
+    });
   }
 });

@@ -238,8 +238,10 @@ const loadJiraProjects = async () => {
     const response = await fetch('/api/jira/projects');
     if (response.ok) {
       const data = await response.json();
-      // Fix: Access projects from the correct nested path
-      jiraProjects.value = data.body?.projects || [];
+      console.log('JIRA projects response:', data); // Debug log
+      // Fix: The API returns data directly, not nested in body
+      jiraProjects.value = data.projects || [];
+      console.log('Loaded JIRA projects:', jiraProjects.value); // Debug log
     } else {
       throw new Error('Failed to load JIRA projects');
     }
