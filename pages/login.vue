@@ -36,7 +36,7 @@ onMounted(() => {
             <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-white">
               <span class="mdi mdi-chart-timeline-variant text-primary-600 text-xl"></span>
             </div>
-            <h2 class="text-2xl font-bold">Project Manager</h2>
+            <h2 class="text-2xl font-bold">The qexle Project Manager</h2>
           </div>
           
           <div class="mt-16">
@@ -92,7 +92,7 @@ onMounted(() => {
             >
               <span class="mdi mdi-chart-timeline-variant text-white text-3xl"></span>
             </div>
-            <h1 class="text-2xl font-bold text-neutral-900 mt-2">Project Manager</h1>
+            <h1 class="text-2xl font-bold text-neutral-900 mt-2">The qexle Project Manager</h1>
             <h2 class="text-xl font-medium text-neutral-700 mt-1">Project Management Platform</h2>
             <p class="text-neutral-600 mt-3">Sign in with your company Microsoft account to access your projects.</p>
           </div>
@@ -134,7 +134,7 @@ onMounted(() => {
           
           <!-- Additional Info -->
           <div class="mt-8 text-center text-sm text-neutral-600">
-            <p>This application is only accessible to Project Manager employees.</p>
+            <p>This application is only accessible to The qexle Project Manager employees.</p>
             <p class="mt-2">
               <span class="mdi mdi-shield-check text-success-500 mr-1"></span>
               Secured with enterprise-grade protection
@@ -144,7 +144,7 @@ onMounted(() => {
         
         <!-- Footer -->
         <div class="text-center mt-6 text-xs text-neutral-500">
-          <p>© 2025 Project Manager. All rights reserved.</p>
+          <p>© 2025 The qexle Project Manager. All rights reserved.</p>
           <p class="mt-1">Version 2.4.1</p>
         </div>
       </div>

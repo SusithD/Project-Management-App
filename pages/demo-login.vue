@@ -144,7 +144,7 @@ onMounted(() => {
               <span class="mdi mdi-chart-timeline-variant text-primary-600 text-xl"></span>
             </div>
             <div>
-              <h2 class="text-2xl font-bold">Project Manager</h2>
+              <h2 class="text-2xl font-bold">The qexle Project Manager</h2>
               <div class="flex items-center mt-1">
                 <span class="bg-yellow-400 text-yellow-900 text-xs font-semibold px-2 py-1 rounded-full">DEMO</span>
                 <span class="ml-2 text-sm text-primary-100">v2.4.1</span>
@@ -233,7 +233,7 @@ onMounted(() => {
               >
                 <span class="mdi mdi-chart-timeline-variant text-white text-3xl"></span>
               </div>
-              <h1 class="text-2xl font-bold text-neutral-900 mt-2">Project Manager</h1>
+              <h1 class="text-2xl font-bold text-neutral-900 mt-2">The qexle Project Manager</h1>
               <div class="flex items-center justify-center mt-2">
                 <span class="bg-yellow-100 text-yellow-800 text-sm font-semibold px-3 py-1 rounded-full border border-yellow-200">
                   DEMO ENVIRONMENT
@@ -377,7 +377,7 @@ onMounted(() => {
           <!-- Enhanced Footer -->
           <div class="text-center mb-8 text-xs text-neutral-500">
             <div class="flex items-center justify-center space-x-4 mb-2">
-              <span>© 2025 Project Manager</span>
+              <span>© 2025 The qexle Project Manager</span>
               <span>•</span>
               <span>Demo Environment v2.4.1</span>
               <span>•</span>
