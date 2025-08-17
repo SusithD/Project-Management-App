@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
 import { useNotificationsStore } from '~/stores/notifications';
 import { useUsersStore } from '~/stores/users'; // Add this line to import users store
+import { useProjectsStore } from '~/stores/projects';
 
 // Import the UserSelect component
 import UserSelect from '~/components/common/UserSelect.vue';
@@ -27,6 +28,7 @@ const usersStore = useUsersStore(); // Initialize the users store
 const error = ref(null);
 // Store the MongoDB ObjectId once we have it
 const mongoObjectId = ref(null);
+const projectsStore = useProjectsStore();
 
 // Collapsible sections state for progressive disclosure
 const projectDescriptionExpanded = ref(false);
@@ -438,6 +440,11 @@ const canEdit = computed(() => {
 
 // Active tab state
 const activeTab = ref('overview');
+
+onMounted(() => {
+  const projectId = route.params.id;
+  projectsStore.fetchProjectById(projectId);
+});
 
 // Load project data on mount
 onMounted(async () => {
