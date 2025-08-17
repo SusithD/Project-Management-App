@@ -35,9 +35,9 @@
               <p class="text-lg font-semibold text-blue-800 mt-1">{{ jiraStatus.projectKey }}</p>
               <p class="text-sm text-blue-700 mt-1">{{ jiraStatus.projectName || 'Loading project details...' }}</p>
             </div>
-            <a 
-              v-if="jiraProjectUrl" 
-              :href="jiraProjectUrl" 
+            <a
+              v-if="jiraProjectUrl"
+              :href="jiraProjectUrl"
               target="_blank"
               class="inline-flex items-center px-3 py-1.5 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -90,7 +90,7 @@
             </svg>
             {{ syncing ? 'Syncing...' : 'Sync Now' }}
           </button>
-          
+
           <button
             @click="unlinkFromJira"
             :disabled="unlinking"
@@ -130,9 +130,9 @@
               :disabled="loadingJiraProjects"
             >
               <option value="">{{ loadingJiraProjects ? 'Loading JIRA projects...' : 'Choose a JIRA project' }}</option>
-              <option 
-                v-for="jiraProject in jiraProjects" 
-                :key="jiraProject.key" 
+              <option
+                v-for="jiraProject in jiraProjects"
+                :key="jiraProject.key"
                 :value="jiraProject.key"
               >
                 {{ jiraProject.key }} - {{ jiraProject.name }}
@@ -175,6 +175,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useNotificationsStore } from '~/stores/notifications';
+import { useAuthStore } from '~/stores/auth';
 
 // Props
 const props = defineProps({
@@ -189,6 +190,7 @@ const emit = defineEmits(['project-updated']);
 
 // Stores
 const notificationsStore = useNotificationsStore();
+const authStore = useAuthStore();
 
 // Reactive data
 const jiraProjects = ref([]);
@@ -202,7 +204,7 @@ const syncing = ref(false);
 // Computed properties
 const jiraStatus = computed(() => {
   const project = props.project;
-  
+
   if (project.jiraIntegration?.enabled) {
     return {
       connected: true,
@@ -212,7 +214,7 @@ const jiraStatus = computed(() => {
       stats: project.jiraIntegration.syncStats
     };
   }
-  
+
   return {
     connected: false,
     projectKey: null,
@@ -226,6 +228,14 @@ const jiraProjectUrl = computed(() => {
   if (jiraStatus.value.connected && jiraStatus.value.projectKey) {
     // Get JIRA base URL from runtime config
     const config = useRuntimeConfig();
+    const { $auth } = useNuxtApp();
+    const isDemoUser = $auth?.currentUser?.email?.includes('@demo.com');
+
+    // Use demo URL for demo users
+    if (isDemoUser) {
+      return `https://demo-company.atlassian.net/projects/${jiraStatus.value.projectKey}`;
+    }
+
     return `${config.public.jira?.baseUrl || 'https://your-domain.atlassian.net'}/browse/${jiraStatus.value.projectKey}`;
   }
   return null;
@@ -235,7 +245,15 @@ const jiraProjectUrl = computed(() => {
 const loadJiraProjects = async () => {
   loadingJiraProjects.value = true;
   try {
-    const response = await fetch('/api/jira/projects');
+    const authStore = useAuthStore();
+    const userEmail = authStore.user?.mail || authStore.user?.email;
+    console.log('[JIRA ProjectLinker] User email:', userEmail);
+    console.log('[JIRA ProjectLinker] Is demo user:', authStore.isDemoUser());
+
+    const url = userEmail ? `/api/jira/projects?userEmail=${encodeURIComponent(userEmail)}` : '/api/jira/projects';
+    console.log('[JIRA ProjectLinker] Requesting URL:', url);
+
+    const response = await fetch(url);
     if (response.ok) {
       const data = await response.json();
       console.log('JIRA projects response:', data); // Debug log
@@ -255,7 +273,10 @@ const loadJiraProjects = async () => {
 
 const linkToJira = async () => {
   if (!selectedJiraProject.value) return;
-  
+
+  const authStore = useAuthStore();
+  const userEmail = authStore.user?.mail || authStore.user?.email;
+
   linking.value = true;
   try {
     const response = await fetch('/api/jira/link-project', {
@@ -266,12 +287,13 @@ const linkToJira = async () => {
       body: JSON.stringify({
         projectId: props.project._id || props.project.id,
         jiraProjectKey: selectedJiraProject.value,
-        syncEnabled: syncEnabled.value
+        syncEnabled: syncEnabled.value,
+        userEmail: userEmail
       })
     });
 
     const data = await response.json();
-    
+
     if (response.ok && data.body?.success) {
       notificationsStore.success(data.body.message);
       emit('project-updated');
@@ -287,6 +309,9 @@ const linkToJira = async () => {
 };
 
 const unlinkFromJira = async () => {
+  const authStore = useAuthStore();
+  const userEmail = authStore.user?.mail || authStore.user?.email;
+
   unlinking.value = true;
   try {
     const response = await fetch('/api/jira/unlink-project', {
@@ -295,12 +320,13 @@ const unlinkFromJira = async () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        projectId: props.project._id || props.project.id
+        projectId: props.project._id || props.project.id,
+        userEmail: userEmail
       })
     });
 
     const data = await response.json();
-    
+
     if (response.ok && data.body?.success) {
       notificationsStore.success(data.body.message);
       emit('project-updated');
@@ -316,6 +342,9 @@ const unlinkFromJira = async () => {
 };
 
 const syncWithJira = async () => {
+  const authStore = useAuthStore();
+  const userEmail = authStore.user?.mail || authStore.user?.email;
+
   syncing.value = true;
   try {
     const response = await fetch('/api/jira/sync-project', {
@@ -324,12 +353,14 @@ const syncWithJira = async () => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        projectId: props.project._id || props.project.id
+        projectKey: jiraStatus.value.projectKey,
+        projectId: props.project._id || props.project.id,
+        userEmail: userEmail
       })
     });
 
     const data = await response.json();
-    
+
     if (response.ok && data.body?.success) {
       notificationsStore.success(data.body.message);
       emit('project-updated');

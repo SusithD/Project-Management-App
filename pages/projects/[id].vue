@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
 import { useNotificationsStore } from '~/stores/notifications';
 import { useUsersStore } from '~/stores/users'; // Add this line to import users store
+import { useProjectsStore } from '~/stores/projects';
 
 // Import the UserSelect component
 import UserSelect from '~/components/common/UserSelect.vue';
@@ -27,6 +28,7 @@ const usersStore = useUsersStore(); // Initialize the users store
 const error = ref(null);
 // Store the MongoDB ObjectId once we have it
 const mongoObjectId = ref(null);
+const projectsStore = useProjectsStore();
 
 // Collapsible sections state for progressive disclosure
 const projectDescriptionExpanded = ref(false);
@@ -57,25 +59,25 @@ const projectStatuses = ['Not Started', 'Ongoing', 'On Hold', 'Completed', 'Canc
 const showMoreActions = ref(false);
 
 // Add a computed property to determine if we're in edit mode with data
-const hasExistingTeamMembers = computed(() => 
+const hasExistingTeamMembers = computed(() =>
   editedProject.value && editedProject.value.team && editedProject.value.team.length > 0
 );
 
-const hasExistingDevelopers = computed(() => 
+const hasExistingDevelopers = computed(() =>
   editedProject.value && editedProject.value.developers && editedProject.value.developers.length > 0
 );
 
 // Get formatted team data for display
 const formattedTeamData = computed(() => {
   if (!project.value) return { total: 0, members: 0, developers: 0, leadership: 0 };
-  
-  const leadCount = 
-    (project.value.assignedTo ? 1 : 0) + 
+
+  const leadCount =
+    (project.value.assignedTo ? 1 : 0) +
     (project.value.responsiblePerson && project.value.responsiblePerson !== project.value.assignedTo ? 1 : 0);
-  
+
   const members = project.value.team ? project.value.team.length : 0;
   const developers = project.value.developers ? project.value.developers.length : 0;
-  
+
   return {
     total: leadCount + members + developers,
     members,
@@ -87,7 +89,7 @@ const formattedTeamData = computed(() => {
 // Function to get user name from user ID
 const getUserName = (userId) => {
   if (!userId) return 'Not assigned';
-  
+
   const user = usersStore.users.find(user => user.id === userId);
   return user ? user.name : userId; // Return name if found, otherwise return ID as fallback
 };
@@ -96,22 +98,22 @@ const getUserName = (userId) => {
 const fetchProject = async () => {
   isLoading.value = true;
   error.value = null;
-  
+
   try {
     // First, we need to get the MongoDB ObjectId from our numeric ID
     // API call to fetch project data
     const response = await fetch(`/api/projects/${projectId}`);
-    
+
     if (!response.ok) {
       throw new Error(`Error fetching project: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     project.value = data;
-    
+
     // Save the MongoDB ObjectId for future API calls
     mongoObjectId.value = data._id;
-    
+
     // Add default empty values for external links if they don't exist
     if (!project.value.externalLinks) {
       project.value.externalLinks = {
@@ -120,10 +122,10 @@ const fetchProject = async () => {
         jiraProject: ''
       };
     }
-    
+
     // Initialize edit form with project data
     editedProject.value = { ...data };
-    
+
     isLoading.value = false;
   } catch (err) {
     console.error('Error fetching project:', err);
@@ -135,13 +137,13 @@ const fetchProject = async () => {
 // Add a project update
 const addUpdate = async () => {
   if (!newUpdate.value.trim()) return;
-  
+
   isSubmittingUpdate.value = true;
-  
+
   try {
     // Create random ID for the update
     const updateId = Math.random().toString(36).substring(2, 15);
-    
+
     const update = {
       id: updateId, // Add an ID field to satisfy the schema validation
       content: newUpdate.value,
@@ -150,14 +152,14 @@ const addUpdate = async () => {
       type: updateType.value, // Add type field to track daily updates
       userId: authStore.userId || authStore.user?.id // Save the user ID for tracking
     };
-    
+
     // Use MongoDB ObjectId for API calls
     const idToUse = mongoObjectId.value || project.value?._id;
-    
+
     if (!idToUse) {
       throw new Error("No valid MongoDB ID available");
     }
-    
+
     // API call to add update
     const response = await fetch(`/api/projects/${idToUse}/updates`, {
       method: 'POST',
@@ -167,18 +169,18 @@ const addUpdate = async () => {
       },
       body: JSON.stringify(update)
     });
-    
+
     if (!response.ok) {
       throw new Error(`Failed to add update: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
-    
+
     // Add to local state first for immediate feedback
     if (!project.value.updates) {
       project.value.updates = [];
     }
-    
+
     // Convert API response format to match UI format
     const uiUpdate = {
       id: data.update.id,
@@ -188,21 +190,21 @@ const addUpdate = async () => {
       type: data.update.type || 'regular',
       userId: data.update.userId
     };
-    
+
     project.value.updates.unshift(uiUpdate);
-    
+
     // Update last update tracking for this user
     if (authStore.userId) {
       lastUpdateByUser.value[authStore.userId] = new Date().toISOString().split('T')[0];
     }
-    
+
     // Refresh missing updates list
     checkMissingDailyUpdates();
-    
+
     // Clear input
     newUpdate.value = '';
     updateType.value = 'regular';
-    
+
     // Show success notification
     if (update.type === 'daily') {
       notificationsStore.success('Daily update added successfully');
@@ -220,17 +222,17 @@ const addUpdate = async () => {
 // Check which team members haven't provided daily updates
 const checkMissingDailyUpdates = () => {
   if (!project.value || !project.value.team) return;
-  
+
   const today = new Date().toISOString().split('T')[0];
-  const teamMembers = [...(project.value.team || []), 
+  const teamMembers = [...(project.value.team || []),
                       ...(project.value.developers || [])];
-  
+
   if (project.value.assignedTo) teamMembers.push(project.value.assignedTo);
   if (project.value.responsiblePerson) teamMembers.push(project.value.responsiblePerson);
-  
+
   // Remove duplicates
   const uniqueTeamMembers = [...new Set(teamMembers)];
-  
+
   // Initialize or update last update tracking
   if (project.value.updates) {
     project.value.updates.forEach(update => {
@@ -242,7 +244,7 @@ const checkMissingDailyUpdates = () => {
       }
     });
   }
-  
+
   // Check which team members need to add updates today
   missingUpdates.value = uniqueTeamMembers.filter(userId => {
     const lastUpdate = lastUpdateByUser.value[userId];
@@ -262,7 +264,7 @@ const formatTimeAgo = (dateStr) => {
   const now = new Date();
   const diffTime = Math.abs(now - date);
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return `${diffDays} days ago`;
@@ -279,24 +281,24 @@ const getLastUpdateDate = (userId) => {
 const deleteFile = async (file, index) => {
   // Use notification confirm instead of browser confirm
   const confirmed = await notificationsStore.confirm(
-    `Are you sure you want to delete ${file.name}?`, 
+    `Are you sure you want to delete ${file.name}?`,
     {
       confirmText: 'Delete',
       cancelText: 'Cancel',
       type: 'warning'
     }
   );
-  
+
   if (!confirmed) return;
-  
+
   try {
     // Use MongoDB ObjectId for API calls
     const idToUse = mongoObjectId.value || project.value?._id;
-    
+
     if (!idToUse) {
       throw new Error("No valid MongoDB ID available");
     }
-    
+
     // API call to delete the file
     const response = await fetch(`/api/projects/${idToUse}/files/${encodeURIComponent(file.name)}`, {
       method: 'DELETE',
@@ -304,11 +306,11 @@ const deleteFile = async (file, index) => {
         'Authorization': authStore.authHeader
       }
     });
-    
+
     if (!response.ok) {
       throw new Error(`Delete failed: ${response.statusText}`);
     }
-    
+
     // Remove from local state
     project.value.files.splice(index, 1);
     notificationsStore.success('File deleted successfully');
@@ -332,11 +334,11 @@ const saveProject = async () => {
   try {
     // Use MongoDB ObjectId for API calls
     const idToUse = mongoObjectId.value || project.value?._id;
-    
+
     if (!idToUse) {
       throw new Error("No valid MongoDB ID available");
     }
-    
+
     // Ensure externalLinks object exists before saving
     if (!editedProject.value.externalLinks) {
       editedProject.value.externalLinks = {
@@ -345,9 +347,9 @@ const saveProject = async () => {
         jiraProject: ''
       };
     }
-    
+
     console.log('Saving project with external links:', editedProject.value.externalLinks);
-    
+
     // API call to update the project
     const response = await fetch(`/api/projects/${idToUse}`, {
       method: 'PUT',
@@ -357,11 +359,11 @@ const saveProject = async () => {
       },
       body: JSON.stringify(editedProject.value)
     });
-    
+
     if (!response.ok) {
       throw new Error(`Update failed: ${response.statusText}`);
     }
-    
+
     // Update local state
     project.value = { ...editedProject.value };
     isEditing.value = false;
@@ -376,24 +378,24 @@ const saveProject = async () => {
 const markProjectCompleted = async () => {
   // Use notification confirm instead of browser confirm
   const confirmed = await notificationsStore.confirm(
-    'Are you sure you want to mark this project as completed?', 
+    'Are you sure you want to mark this project as completed?',
     {
       confirmText: 'Mark Completed',
       cancelText: 'Cancel',
       type: 'info'
     }
   );
-  
+
   if (!confirmed) return;
-  
+
   try {
     // Set status to completed
-    editedProject.value = { 
-      ...project.value, 
+    editedProject.value = {
+      ...project.value,
       status: 'Completed',
       progress: 100
     };
-    
+
     await saveProject();
     notificationsStore.success(`${project.value.name} marked as completed`);
   } catch (err) {
@@ -405,26 +407,26 @@ const markProjectCompleted = async () => {
 // Calculate days remaining
 const daysRemaining = computed(() => {
   if (!project.value) return 0;
-  
+
   const endDate = new Date(project.value.endDate);
   const today = new Date();
   const diffTime = endDate - today;
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+
   return diffDays;
 });
 
 // Check if project is overdue
 const isOverdue = computed(() => {
   if (!project.value) return false;
-  
+
   return daysRemaining.value < 0 && project.value.status !== 'Completed';
 });
 
 // Calculate progress status
 const progressStatus = computed(() => {
   if (!project.value) return '';
-  
+
   if (project.value.progress < 25) return 'At Risk';
   if (project.value.progress < 50) return 'Needs Attention';
   if (project.value.progress < 75) return 'On Track';
@@ -439,6 +441,11 @@ const canEdit = computed(() => {
 // Active tab state
 const activeTab = ref('overview');
 
+onMounted(() => {
+  const projectId = route.params.id;
+  projectsStore.fetchProjectById(projectId);
+});
+
 // Load project data on mount
 onMounted(async () => {
   // Make sure users are loaded first, so they're available for the UserSelect components
@@ -448,10 +455,10 @@ onMounted(async () => {
   } catch (error) {
     console.error('Error loading users:', error);
   }
-  
+
   // Then fetch the project
   await fetchProject();
-  
+
   // Initialize missing updates check
   checkMissingDailyUpdates();
 });
@@ -470,13 +477,13 @@ const isValidUrl = (url) => {
 // Function to open external link with validation
 const openExternalLink = (url) => {
   if (!url) return;
-  
+
   // Add https:// if protocol is missing
   let finalUrl = url;
   if (!/^https?:\/\//i.test(finalUrl)) {
     finalUrl = 'https://' + finalUrl;
   }
-  
+
   window.open(finalUrl, '_blank');
 };
 
@@ -492,7 +499,7 @@ const jiraProjectKey = ref(null);
 const jiraIntegrationActive = computed(() => {
   // Check for Jira integration using the correct data structure
   return (
-    project.value?.jiraIntegration?.enabled && 
+    project.value?.jiraIntegration?.enabled &&
     project.value?.jiraIntegration?.projectKey
   );
 });
@@ -502,7 +509,7 @@ const isSyncing = ref(false);
 
 const syncJiraProject = async () => {
   if (!project.value?.jiraIntegration?.projectKey) return;
-  
+
   isSyncing.value = true;
   try {
     const response = await fetch('/api/jira/sync-project', {
@@ -513,7 +520,8 @@ const syncJiraProject = async () => {
       },
       body: JSON.stringify({
         projectKey: project.value.jiraIntegration.projectKey,
-        projectId: mongoObjectId.value || project.value._id
+        projectId: mongoObjectId.value || project.value._id,
+        userEmail: user.value?.email
       })
     });
 
@@ -522,14 +530,14 @@ const syncJiraProject = async () => {
     }
 
     const data = await response.json();
-    
+
     // Update project with sync timestamp
     if (project.value.jiraIntegration) {
       project.value.jiraIntegration.lastSyncDate = new Date().toISOString();
     }
-    
+
     notificationsStore.success('Jira project synced successfully');
-    
+
     // Refresh project data to get latest sync info
     await fetchProject();
   } catch (err) {
@@ -542,17 +550,25 @@ const syncJiraProject = async () => {
 
 const openJiraProject = () => {
   if (!project.value?.jiraIntegration?.projectKey) return;
-  
+
   // Get the Jira base URL from runtime configuration
   const config = useRuntimeConfig();
-  const jiraBaseUrl = config.jira?.baseUrl || config.public.jira?.baseUrl;
-  
-  if (!jiraBaseUrl) {
-    notificationsStore.error('Jira base URL is not configured');
-    return;
+  const isDemoUser = user.value?.email?.includes('@demo.com');
+
+  let jiraBaseUrl;
+
+  // Use demo URL for demo users
+  if (isDemoUser) {
+    jiraBaseUrl = 'https://demo-company.atlassian.net';
+  } else {
+    jiraBaseUrl = config.jira?.baseUrl || config.public.jira?.baseUrl;
+    if (!jiraBaseUrl) {
+      notificationsStore.error('Jira base URL is not configured');
+      return;
+    }
   }
-  
-  const url = `${jiraBaseUrl}/browse/${project.value.jiraIntegration.projectKey}`;
+
+  const url = `${jiraBaseUrl}/projects/${project.value.jiraIntegration.projectKey}`;
   window.open(url, '_blank');
 };
 
@@ -574,7 +590,7 @@ const exportProject = async () => {
       exportDate: new Date().toISOString(),
       exportedBy: authStore.userFullName
     };
-    
+
     const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -584,7 +600,7 @@ const exportProject = async () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     notificationsStore.success('Project exported successfully');
     showMoreActions.value = false;
   } catch (err) {
@@ -602,9 +618,9 @@ const duplicateProject = async () => {
       type: 'info'
     }
   );
-  
+
   if (!confirmed) return;
-  
+
   try {
     const duplicatedProject = {
       ...project.value,
@@ -618,11 +634,11 @@ const duplicateProject = async () => {
       endDate: null,
       deadline: null
     };
-    
+
     // Remove ID fields that should be auto-generated
     delete duplicatedProject.id;
     delete duplicatedProject._id;
-    
+
     const response = await fetch('/api/projects', {
       method: 'POST',
       headers: {
@@ -631,14 +647,14 @@ const duplicateProject = async () => {
       },
       body: JSON.stringify(duplicatedProject)
     });
-    
+
     if (!response.ok) {
       throw new Error(`Failed to duplicate project: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     notificationsStore.success('Project duplicated successfully');
-    
+
     // Navigate to the new project
     router.push(`/projects/${data.id}`);
     showMoreActions.value = false;
@@ -657,21 +673,21 @@ const archiveProject = async () => {
       type: 'warning'
     }
   );
-  
+
   if (!confirmed) return;
-  
+
   try {
-    editedProject.value = { 
-      ...project.value, 
+    editedProject.value = {
+      ...project.value,
       status: 'Archived',
       archivedDate: new Date().toISOString(),
       archivedBy: authStore.userId
     };
-    
+
     await saveProject();
     notificationsStore.success(`${project.value.name} has been archived`);
     showMoreActions.value = false;
-    
+
     // Optionally navigate back to projects list
     setTimeout(() => {
       router.push('/projects');
@@ -782,13 +798,13 @@ onMounted(async () => {
   } catch (error) {
     console.error('Error loading users:', error);
   }
-  
+
   // Then fetch the project
   await fetchProject();
-  
+
   // Initialize missing updates check
   checkMissingDailyUpdates();
-  
+
   // Add click outside listener for dropdown
   document.addEventListener('click', closeDropdownOnClickOutside);
 });
@@ -805,7 +821,7 @@ onUnmounted(() => {
     <div v-if="isLoading" class="flex justify-center items-center h-64">
       <div class="animate-spin rounded-full h-12 w-12 border-4 border-primary-600 border-t-transparent"></div>
     </div>
-    
+
     <!-- Error State -->
     <div v-else-if="error" class="bg-error-50 border border-error-200 text-error-800 rounded-md p-4 mb-4">
       <div class="flex">
@@ -815,8 +831,8 @@ onUnmounted(() => {
         <div class="ml-3">
           <h3 class="text-sm font-medium">Error</h3>
           <p class="mt-2 text-sm">{{ error }}</p>
-          <button 
-            @click="fetchProject" 
+          <button
+            @click="fetchProject"
             class="mt-2 text-sm text-error-600 hover:text-error-800 font-medium underline"
           >
             Try Again
@@ -824,7 +840,7 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
-    
+
     <!-- Project Details -->
     <div v-else>
       <!-- Breadcrumb Navigation -->
@@ -847,12 +863,12 @@ onUnmounted(() => {
           <div class="flex-1">
             <div class="flex flex-wrap items-center gap-3 mb-2">
               <h1 class="text-3xl font-bold text-neutral-900">{{ project?.name }}</h1>
-              <span 
+              <span
                 v-if="project && project.status"
                 :class="[
                   'px-3 py-1 text-xs font-medium rounded-full',
-                  project.status === 'Completed' ? 'bg-success-100 text-success-800' : 
-                  project.status === 'Ongoing' ? 'bg-accent-100 text-accent-800' : 
+                  project.status === 'Completed' ? 'bg-success-100 text-success-800' :
+                  project.status === 'Ongoing' ? 'bg-accent-100 text-accent-800' :
                   project.status === 'On Hold' ? 'bg-warning-100 text-warning-800' :
                   project.status === 'Cancelled' ? 'bg-error-100 text-error-800' :
                   'bg-neutral-100 text-neutral-800'
@@ -860,7 +876,7 @@ onUnmounted(() => {
               >
                 {{ project.status }}
               </span>
-              <span v-if="project?.priority" 
+              <span v-if="project?.priority"
                     :class="[
                       'px-2 py-1 text-xs font-medium rounded-full',
                       project.priority === 'Urgent' ? 'bg-error-100 text-error-800' :
@@ -872,7 +888,7 @@ onUnmounted(() => {
                 {{ project.priority }} Priority
               </span>
             </div>
-            
+
             <div class="flex flex-wrap items-center gap-4 text-sm text-neutral-600">
               <span><strong>ID:</strong> {{ project?.id }}</span>
               <span v-if="project?.company"><strong>Company:</strong> {{ project.company }}</span>
@@ -900,12 +916,12 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- Quick Action Buttons -->
           <div class="flex flex-wrap items-center gap-3 mt-4 lg:mt-0 lg:ml-6">
             <!-- Quick Status Updates -->
             <div class="flex items-center bg-neutral-100 rounded-lg p-1">
-              <button 
+              <button
                 v-if="!isEditing && project?.status !== 'Completed' && canEdit"
                 @click="markProjectCompleted"
                 class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-success-600 text-white hover:bg-success-700 transition-colors"
@@ -914,30 +930,30 @@ onUnmounted(() => {
                 <span class="mdi mdi-check-circle mr-1"></span>
                 Complete
               </button>
-              
-              <button 
+
+              <button
                 v-if="!isEditing && canEdit"
-                @click="toggleEditMode" 
+                @click="toggleEditMode"
                 class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors ml-1"
                 title="Edit project"
               >
                 <span class="mdi mdi-pencil mr-1"></span>
                 Edit
               </button>
-              
+
               <!-- Save/Cancel during edit mode -->
-              <button 
+              <button
                 v-if="isEditing"
-                @click="saveProject" 
+                @click="saveProject"
                 class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-success-600 text-white hover:bg-success-700 transition-colors"
               >
                 <span class="mdi mdi-content-save mr-1"></span>
                 Save
               </button>
-              
-              <button 
+
+              <button
                 v-if="isEditing"
-                @click="toggleEditMode" 
+                @click="toggleEditMode"
                 class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-200 text-neutral-700 hover:bg-neutral-300 transition-colors ml-1"
               >
                 <span class="mdi mdi-close mr-1"></span>
@@ -947,29 +963,29 @@ onUnmounted(() => {
 
             <!-- More Actions Dropdown -->
             <div class="relative" v-if="!isEditing">
-              <button 
+              <button
                 @click="showMoreActions = !showMoreActions"
                 class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 transition-colors"
               >
                 <span class="mdi mdi-dots-vertical mr-1"></span>
                 More
               </button>
-              
+
               <!-- Dropdown Menu -->
-              <div v-show="showMoreActions" 
+              <div v-show="showMoreActions"
                    class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-neutral-200 z-10">
                 <div class="py-1">
-                  <button @click="exportProject" 
+                  <button @click="exportProject"
                           class="block w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
                     <span class="mdi mdi-download mr-2"></span>
                     Export Project
                   </button>
-                  <button @click="duplicateProject" 
+                  <button @click="duplicateProject"
                           class="block w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
                     <span class="mdi mdi-content-duplicate mr-2"></span>
                     Duplicate Project
                   </button>
-                  <button @click="archiveProject" 
+                  <button @click="archiveProject"
                           class="block w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
                     <span class="mdi mdi-archive mr-2"></span>
                     Archive Project
@@ -996,11 +1012,11 @@ onUnmounted(() => {
               </div>
               <div class="mt-3">
                 <div class="flex space-x-3">
-                  <button @click="activeTab = 'overview'; timelineExpanded = true" 
+                  <button @click="activeTab = 'overview'; timelineExpanded = true"
                           class="text-xs bg-error-100 text-error-800 px-3 py-1 rounded-md hover:bg-error-200 transition-colors">
                     Update Timeline
                   </button>
-                  <button v-if="canEdit" @click="markProjectCompleted" 
+                  <button v-if="canEdit" @click="markProjectCompleted"
                           class="text-xs bg-error-600 text-white px-3 py-1 rounded-md hover:bg-error-700 transition-colors">
                     Mark Complete
                   </button>
@@ -1011,7 +1027,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Due Soon Alert -->
-        <!-- <div v-else-if="daysRemaining <= 7 && daysRemaining > 0 && project?.status !== 'Completed'" 
+        <!-- <div v-else-if="daysRemaining <= 7 && daysRemaining > 0 && project?.status !== 'Completed'"
              class="bg-warning-50 border-l-4 border-warning-500 p-4 rounded-md">
           <div class="flex">
             <div class="flex-shrink-0">
@@ -1038,7 +1054,7 @@ onUnmounted(() => {
                 <p>This project has blockers that need attention. Review and resolve them to keep the project on track.</p>
               </div>
               <div class="mt-3">
-                <button @click="activeTab = 'overview'; blockersExpanded = true" 
+                <button @click="activeTab = 'overview'; blockersExpanded = true"
                         class="text-xs bg-error-100 text-error-800 px-3 py-1 rounded-md hover:bg-error-200 transition-colors">
                   View Blockers
                 </button>
@@ -1059,7 +1075,7 @@ onUnmounted(() => {
                 <p>{{ missingUpdates.length }} team {{ missingUpdates.length === 1 ? 'member needs' : 'members need' }} to provide daily updates.</p>
               </div>
               <div class="mt-3">
-                <button @click="activeTab = 'updates'" 
+                <button @click="activeTab = 'updates'"
                         class="text-xs bg-warning-100 text-warning-800 px-3 py-1 rounded-md hover:bg-warning-200 transition-colors">
                   View Updates
                 </button>
@@ -1069,7 +1085,7 @@ onUnmounted(() => {
         </div> -->
 
         <!-- Low Progress Alert -->
-        <!-- <div v-if="project?.progress < 25 && !isOverdue && project?.status === 'Ongoing'" 
+        <!-- <div v-if="project?.progress < 25 && !isOverdue && project?.status === 'Ongoing'"
              class="bg-accent-50 border-l-4 border-accent-500 p-4 rounded-md">
           <div class="flex">
             <div class="flex-shrink-0">
@@ -1099,24 +1115,24 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      
+
       <!-- KPI Dashboard - New compact dashboard showing key metrics -->
       <div class="bg-white rounded-xl shadow-lg p-5 mb-6 border-l-4 border-primary-600">
         <h2 class="text-lg font-semibold text-neutral-800 mb-4 flex items-center">
           <span class="mdi mdi-chart-box text-xl text-primary-600 mr-2"></span>
           Project Dashboard
         </h2>
-        
+
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- Progress KPI -->
           <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow p-4 border border-neutral-100 flex flex-col justify-between">
             <div class="flex justify-between items-start mb-3">
               <div class="text-neutral-500 text-sm font-medium">Completion</div>
-              <div 
+              <div
                 :class="[
                   'text-xs px-2 py-0.5 rounded-full',
-                  project?.progress >= 75 ? 'bg-success-100 text-success-800' : 
-                  project?.progress >= 50 ? 'bg-accent-100 text-accent-800' : 
+                  project?.progress >= 75 ? 'bg-success-100 text-success-800' :
+                  project?.progress >= 50 ? 'bg-accent-100 text-accent-800' :
                   'bg-warning-100 text-warning-800'
                 ]"
               >
@@ -1152,16 +1168,16 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- Timeline KPI -->
           <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow p-4 border border-neutral-100 flex flex-col justify-between">
             <div class="flex justify-between items-start mb-3">
               <div class="text-neutral-500 text-sm font-medium">Timeline</div>
-              <div 
+              <div
                 :class="[
                   'text-xs px-2 py-0.5 rounded-full',
-                  isOverdue ? 'bg-error-100 text-error-800' : 
-                  daysRemaining < 7 ? 'bg-warning-100 text-warning-800' : 
+                  isOverdue ? 'bg-error-100 text-error-800' :
+                  daysRemaining < 7 ? 'bg-warning-100 text-warning-800' :
                   'bg-success-100 text-success-800'
                 ]"
               >
@@ -1173,11 +1189,11 @@ onUnmounted(() => {
                 <div class="text-2xl font-bold text-neutral-900">{{ Math.abs(daysRemaining) }}</div>
                 <div class="text-sm text-neutral-600">{{ isOverdue ? 'Days overdue' : 'Days left' }}</div>
               </div>
-              <div 
+              <div
                 :class="[
                   'w-12 h-12 rounded-full flex items-center justify-center text-xl',
-                  isOverdue ? 'bg-error-600 text-white' : 
-                  daysRemaining < 7 ? 'bg-warning-600 text-white' : 
+                  isOverdue ? 'bg-error-600 text-white' :
+                  daysRemaining < 7 ? 'bg-warning-600 text-white' :
                   'bg-success-600 text-white'
                 ]"
               >
@@ -1187,7 +1203,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- Team KPI -->
           <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow p-4 border border-neutral-100 flex flex-col justify-between">
             <div class="flex justify-between items-start mb-3">
@@ -1216,12 +1232,12 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- Status KPI -->
           <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow p-4 border border-neutral-100 flex flex-col justify-between">
             <div class="flex justify-between items-start mb-3">
               <div class="text-neutral-500 text-sm font-medium">Status</div>
-              <div 
+              <div
                 :class="[
                   'text-xs px-2 py-0.5 rounded-full',
                   project?.blockers ? 'bg-error-100 text-error-800' : 'bg-success-100 text-success-800'
@@ -1237,7 +1253,7 @@ onUnmounted(() => {
                 </div>
                 <div class="text-sm text-neutral-600">Priority</div>
               </div>
-              <div 
+              <div
                 :class="[
                   'w-12 h-12 rounded-full flex items-center justify-center text-xl',
                   project?.blockers ? 'bg-error-600 text-white' : 'bg-success-600 text-white',
@@ -1250,14 +1266,14 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      
+
       <!-- Edit Form -->
       <div v-if="isEditing" class="bg-white rounded-lg shadow-card p-6 mb-6">
         <h2 class="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
           <span class="mdi mdi-pencil-outline text-xl text-primary-600"></span>
           Edit Project Details
         </h2>
-        
+
         <!-- Navigation tabs for edit sections -->
         <div class="mb-6 border-b border-neutral-200">
           <nav class="flex -mb-px overflow-x-auto" aria-label="Edit sections">
@@ -1266,8 +1282,8 @@ onUnmounted(() => {
               @click="activeTab = 'basic'"
               :class="[
                 'mr-8 py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-                activeTab === 'basic' 
-                  ? 'border-primary-600 text-primary-600' 
+                activeTab === 'basic'
+                  ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
               ]"
             >
@@ -1279,8 +1295,8 @@ onUnmounted(() => {
               @click="activeTab = 'team'"
               :class="[
                 'mr-8 py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-                activeTab === 'team' 
-                  ? 'border-primary-600 text-primary-600' 
+                activeTab === 'team'
+                  ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
               ]"
             >
@@ -1292,8 +1308,8 @@ onUnmounted(() => {
               @click="activeTab = 'timeline'"
               :class="[
                 'mr-8 py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-                activeTab === 'timeline' 
-                  ? 'border-primary-600 text-primary-600' 
+                activeTab === 'timeline'
+                  ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
               ]"
             >
@@ -1305,8 +1321,8 @@ onUnmounted(() => {
               @click="activeTab = 'details'"
               :class="[
                 'mr-8 py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-                activeTab === 'details' 
-                  ? 'border-primary-600 text-primary-600' 
+                activeTab === 'details'
+                  ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
               ]"
             >
@@ -1318,8 +1334,8 @@ onUnmounted(() => {
               @click="activeTab = 'blockers'"
               :class="[
                 'mr-8 py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-                activeTab === 'blockers' 
-                  ? 'border-primary-600 text-primary-600' 
+                activeTab === 'blockers'
+                  ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
               ]"
             >
@@ -1331,8 +1347,8 @@ onUnmounted(() => {
               @click="activeTab = 'links'"
               :class="[
                 'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-                activeTab === 'links' 
-                  ? 'border-primary-600 text-primary-600' 
+                activeTab === 'links'
+                  ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
               ]"
             >
@@ -1341,7 +1357,7 @@ onUnmounted(() => {
             </button>
           </nav>
         </div>
-        
+
         <!-- Main Edit Tabs Content -->
         <div class="my-6">
           <!-- Basic Info Tab -->
@@ -1356,7 +1372,7 @@ onUnmounted(() => {
                   </span>
                 </label>
                 <div class="relative">
-                  <input 
+                  <input
                     id="project-name"
                     v-model="editedProject.name"
                     type="text"
@@ -1364,7 +1380,7 @@ onUnmounted(() => {
                   />
                 </div>
               </div>
-              
+
               <!-- Company -->
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                 <label for="project-company" class="block text-sm font-medium text-neutral-700 mb-2">
@@ -1374,7 +1390,7 @@ onUnmounted(() => {
                   </span>
                 </label>
                 <div class="relative">
-                  <input 
+                  <input
                     id="project-company"
                     v-model="editedProject.company"
                     type="text"
@@ -1383,7 +1399,7 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
               <!-- Category -->
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
@@ -1394,7 +1410,7 @@ onUnmounted(() => {
                   </span>
                 </label>
                 <div class="relative">
-                  <select 
+                  <select
                     id="project-category"
                     v-model="editedProject.category"
                     class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
@@ -1408,7 +1424,7 @@ onUnmounted(() => {
                   </select>
                 </div>
               </div>
-              
+
               <!-- Status -->
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                 <label for="project-status" class="block text-sm font-medium text-neutral-700 mb-2">
@@ -1418,7 +1434,7 @@ onUnmounted(() => {
                   </span>
                 </label>
                 <div class="relative">
-                  <select 
+                  <select
                     id="project-status"
                     v-model="editedProject.status"
                     class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
@@ -1427,7 +1443,7 @@ onUnmounted(() => {
                   </select>
                 </div>
               </div>
-              
+
               <!-- Priority -->
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                 <label for="project-priority" class="block text-sm font-medium text-neutral-700 mb-2">
@@ -1437,7 +1453,7 @@ onUnmounted(() => {
                   </span>
                 </label>
                 <div class="relative">
-                  <select 
+                  <select
                     id="project-priority"
                     v-model="editedProject.priority"
                     class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
@@ -1450,7 +1466,7 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            
+
             <!-- Progress Bar -->
             <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
               <div class="flex justify-between items-center mb-2">
@@ -1458,11 +1474,11 @@ onUnmounted(() => {
                   <span class="mdi mdi-chart-line text-primary-600"></span>
                   Progress
                 </label>
-                <div 
+                <div
                   :class="[
-                    'text-xs font-medium py-1 px-3 rounded-full', 
-                    editedProject.progress >= 75 ? 'bg-success-100 text-success-800' : 
-                    editedProject.progress >= 40 ? 'bg-accent-100 text-accent-800' : 
+                    'text-xs font-medium py-1 px-3 rounded-full',
+                    editedProject.progress >= 75 ? 'bg-success-100 text-success-800' :
+                    editedProject.progress >= 40 ? 'bg-accent-100 text-accent-800' :
                     'bg-warning-100 text-warning-800'
                   ]"
                 >
@@ -1470,17 +1486,17 @@ onUnmounted(() => {
                 </div>
               </div>
               <div class="w-full bg-neutral-200 rounded-full h-2.5 my-2">
-                <div 
+                <div
                   :class="[
                     'h-2.5 rounded-full transition-all duration-300',
-                    editedProject.progress >= 75 ? 'bg-success-600' : 
-                    editedProject.progress >= 40 ? 'bg-accent-600' : 
-                    'bg-warning-600' 
+                    editedProject.progress >= 75 ? 'bg-success-600' :
+                    editedProject.progress >= 40 ? 'bg-accent-600' :
+                    'bg-warning-600'
                   ]"
                   :style="`width: ${editedProject.progress}%`"
                 ></div>
               </div>
-              <input 
+              <input
                 id="project-progress"
                 v-model.number="editedProject.progress"
                 type="range"
@@ -1498,7 +1514,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- Team Members Tab -->
           <div v-if="activeTab === 'team'" class="space-y-8">
             <!-- Project Lead - Enhanced with UserSelect component -->
@@ -1507,7 +1523,7 @@ onUnmounted(() => {
                 <span class="mdi mdi-account-tie text-xl text-primary-600 mr-2"></span>
                 Project Leadership
               </h3>
-              
+
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- Project Lead -->
                 <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
@@ -1526,7 +1542,7 @@ onUnmounted(() => {
                     :filterRole="null"
                   />
                 </div>
-                
+
                 <!-- Responsible Person -->
                 <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                   <label class="block text-sm font-medium text-neutral-700 mb-3 flex items-center justify-between">
@@ -1545,7 +1561,7 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            
+
             <!-- Team Members - Enhanced with UserSelect component -->
             <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-accent-500 mb-6">
               <div class="flex justify-between items-center mb-4">
@@ -1558,7 +1574,7 @@ onUnmounted(() => {
                   {{ editedProject.team.length }} Members
                 </span>
               </div>
-              
+
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                 <!-- Using UserSelect component -->
                 <UserSelect
@@ -1568,17 +1584,17 @@ onUnmounted(() => {
                   :filterRole="null"
                 />
               </div>
-              
+
               <!-- Current team members display -->
               <div v-if="hasExistingTeamMembers" class="mt-6">
                 <h4 class="text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
                   <span class="mdi mdi-account-check-outline text-accent-600"></span>
                   Current Team
                 </h4>
-                
+
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div 
-                    v-for="(memberId, index) in editedProject.team" 
+                  <div
+                    v-for="(memberId, index) in editedProject.team"
                     :key="`team-${index}`"
                     class="flex items-center p-3 bg-white border border-neutral-200 rounded-lg hover:shadow-sm transition-all duration-200"
                   >
@@ -1588,8 +1604,8 @@ onUnmounted(() => {
                     <div class="flex-1 min-w-0">
                       <div class="font-medium truncate">{{ getUserName(memberId) }}</div>
                     </div>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       @click="editedProject.team = editedProject.team.filter((_, i) => i !== index)"
                       class="ml-2 text-neutral-400 hover:text-error-500 transition-colors"
                       title="Remove from team"
@@ -1599,7 +1615,7 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-              
+
               <!-- Empty state when no team members -->
               <div v-else class="text-center p-6 bg-neutral-50 rounded-lg border border-dashed border-neutral-200 mt-4">
                 <span class="mdi mdi-account-group-outline text-4xl text-neutral-400 block mb-2"></span>
@@ -1607,7 +1623,7 @@ onUnmounted(() => {
                 <p class="text-xs text-neutral-400 mt-1">Use the dropdown above to add team members</p>
               </div>
             </div>
-            
+
             <!-- Developers - Enhanced with UserSelect component -->
             <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-success-500">
               <div class="flex justify-between items-center mb-4">
@@ -1620,7 +1636,7 @@ onUnmounted(() => {
                   {{ editedProject.developers.length }} Developers
                 </span>
               </div>
-              
+
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                 <!-- Using UserSelect component -->
                 <UserSelect
@@ -1630,17 +1646,17 @@ onUnmounted(() => {
                   :filterRole="null"
                 />
               </div>
-              
+
               <!-- Current developers display -->
               <div v-if="hasExistingDevelopers" class="mt-6">
                 <h4 class="text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
                   <span class="mdi mdi-check-circle-outline text-success-600"></span>
                   Current Developers
                 </h4>
-                
+
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div 
-                    v-for="(devId, index) in editedProject.developers" 
+                  <div
+                    v-for="(devId, index) in editedProject.developers"
                     :key="`dev-${index}`"
                     class="flex items-center p-3 bg-white border border-neutral-200 rounded-lg hover:shadow-sm transition-all duration-200"
                   >
@@ -1650,8 +1666,8 @@ onUnmounted(() => {
                     <div class="flex-1 min-w-0">
                       <div class="font-medium truncate">{{ getUserName(devId) }}</div>
                     </div>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       @click="editedProject.developers = editedProject.developers.filter((_, i) => i !== index)"
                       class="ml-2 text-neutral-400 hover:text-error-500 transition-colors"
                       title="Remove developer"
@@ -1661,7 +1677,7 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-              
+
               <!-- Empty state when no developers -->
               <div v-else class="text-center p-6 bg-neutral-50 rounded-lg border border-dashed border-neutral-200 mt-4">
                 <span class="mdi mdi-laptop-off text-4xl text-neutral-400 block mb-2"></span>
@@ -1670,7 +1686,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- Timeline Tab -->
           <div v-if="activeTab === 'timeline'" class="space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1681,7 +1697,7 @@ onUnmounted(() => {
                   Start Date
                 </label>
                 <div class="relative">
-                  <input 
+                  <input
                     id="project-start-date"
                     v-model="editedProject.startDate"
                     type="date"
@@ -1689,7 +1705,7 @@ onUnmounted(() => {
                   />
                 </div>
               </div>
-              
+
               <!-- End Date -->
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                 <label for="project-end-date" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
@@ -1697,7 +1713,7 @@ onUnmounted(() => {
                   End Date
                 </label>
                 <div class="relative">
-                  <input 
+                  <input
                     id="project-end-date"
                     v-model="editedProject.endDate"
                     type="date"
@@ -1705,7 +1721,7 @@ onUnmounted(() => {
                   />
                 </div>
               </div>
-              
+
               <!-- Initially Raised On -->
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                 <label for="project-raised-on" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
@@ -1713,7 +1729,7 @@ onUnmounted(() => {
                   Initially Raised On
                 </label>
                 <div class="relative">
-                  <input 
+                  <input
                     id="project-raised-on"
                     v-model="editedProject.initiallyRaisedOn"
                     type="date"
@@ -1721,7 +1737,7 @@ onUnmounted(() => {
                   />
                 </div>
               </div>
-              
+
               <!-- Deadline -->
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                 <label for="project-deadline" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
@@ -1729,7 +1745,7 @@ onUnmounted(() => {
                   Deadline
                 </label>
                 <div class="relative">
-                  <input 
+                  <input
                     id="project-deadline"
                     v-model="editedProject.deadline"
                     type="date"
@@ -1737,7 +1753,7 @@ onUnmounted(() => {
                   />
                 </div>
               </div>
-              
+
               <!-- Status Phase -->
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                 <label for="project-status-phase" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
@@ -1745,7 +1761,7 @@ onUnmounted(() => {
                   Status Phase
                 </label>
                 <div class="relative">
-                  <select 
+                  <select
                     id="project-status-phase"
                     v-model="editedProject.statusPhase"
                     class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
@@ -1759,7 +1775,7 @@ onUnmounted(() => {
                   </select>
                 </div>
               </div>
-              
+
               <!-- Pending Days -->
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                 <label for="project-pending" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
@@ -1767,7 +1783,7 @@ onUnmounted(() => {
                   Pending Days
                 </label>
                 <div class="flex items-center">
-                  <input 
+                  <input
                     id="project-pending"
                     v-model.number="editedProject.pendingDays"
                     type="number"
@@ -1782,7 +1798,7 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            
+
             <!-- Timeline visualization -->
             <div class="bg-white rounded-xl shadow-md p-6 border border-neutral-100">
               <h3 class="text-md font-semibold text-neutral-800 mb-3">Timeline Overview</h3>
@@ -1804,7 +1820,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- Additional Details Tab -->
           <div v-if="activeTab === 'details'" class="space-y-6">
             <!-- Remarks -->
@@ -1814,7 +1830,7 @@ onUnmounted(() => {
                 Remarks
               </label>
               <div class="relative">
-                <textarea 
+                <textarea
                   id="project-remarks"
                   v-model="editedProject.remarks"
                   rows="4"
@@ -1823,7 +1839,7 @@ onUnmounted(() => {
                 ></textarea>
               </div>
             </div>
-            
+
             <!-- Notes -->
             <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
               <label for="project-notes" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
@@ -1831,7 +1847,7 @@ onUnmounted(() => {
                 Notes
               </label>
               <div class="relative">
-                <textarea 
+                <textarea
                   id="project-notes"
                   v-model="editedProject.notes"
                   rows="4"
@@ -1840,7 +1856,7 @@ onUnmounted(() => {
                 ></textarea>
               </div>
             </div>
-            
+
             <!-- Comments -->
             <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
               <label for="project-comments" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
@@ -1848,7 +1864,7 @@ onUnmounted(() => {
                 Comments
               </label>
               <div class="relative">
-                <textarea 
+                <textarea
                   id="project-comments"
                   v-model="editedProject.comments"
                   rows="4"
@@ -1858,7 +1874,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- Blockers Tab -->
           <div v-if="activeTab === 'blockers'" class="space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1869,7 +1885,7 @@ onUnmounted(() => {
                   Blockers
                 </label>
                 <div class="relative">
-                  <textarea 
+                  <textarea
                     id="project-blockers"
                     v-model="editedProject.blockers"
                     rows="6"
@@ -1881,7 +1897,7 @@ onUnmounted(() => {
                   </span>
                 </div>
               </div>
-              
+
               <!-- Feedback for Blockers -->
               <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-accent-500">
                 <label for="project-feedback" class="block text-sm font-medium text-neutral-700 mb-3 flex items-center gap-2">
@@ -1889,7 +1905,7 @@ onUnmounted(() => {
                   Feedback for Blockers
                 </label>
                 <div class="relative">
-                  <textarea 
+                  <textarea
                     id="project-feedback"
                     v-model="editedProject.feedbackForBlockers"
                     rows="6"
@@ -1903,7 +1919,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- External Links Tab - New Tab -->
           <div v-if="activeTab === 'links'" class="space-y-6">
             <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
@@ -1911,7 +1927,7 @@ onUnmounted(() => {
                 <span class="mdi mdi-link-variant text-xl text-purple-600 mr-2"></span>
                 External Project Links
               </h3>
-              
+
               <div class="grid grid-cols-1 gap-6">
                 <!-- GitHub Repository Link -->
                 <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
@@ -1923,7 +1939,7 @@ onUnmounted(() => {
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
                       <span class="mdi mdi-link"></span>
                     </span>
-                    <input 
+                    <input
                       id="project-github"
                       v-model="editedProject.externalLinks.githubRepo"
                       type="text"
@@ -1936,7 +1952,7 @@ onUnmounted(() => {
                     Enter the full GitHub repository URL
                   </p>
                 </div>
-                
+
                 <!-- Figma Link -->
                 <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                   <label for="project-figma" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
@@ -1947,7 +1963,7 @@ onUnmounted(() => {
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
                       <span class="mdi mdi-link"></span>
                     </span>
-                    <input 
+                    <input
                       id="project-figma"
                       v-model="editedProject.externalLinks.figmaLink"
                       type="text"
@@ -1960,7 +1976,7 @@ onUnmounted(() => {
                     Enter the Figma design file link
                   </p>
                 </div>
-                
+
                 <!-- Jira Project Link -->
                 <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200 hover:shadow-sm">
                   <label for="project-jira" class="block text-sm font-medium text-neutral-700 mb-2 flex items-center gap-2">
@@ -1971,7 +1987,7 @@ onUnmounted(() => {
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
                       <span class="mdi mdi-link"></span>
                     </span>
-                    <input 
+                    <input
                       id="project-jira"
                       v-model="editedProject.externalLinks.jiraProject"
                       type="text"
@@ -1985,7 +2001,7 @@ onUnmounted(() => {
                   </p>
                 </div>
               </div>
-              
+
               <!-- Preview of links -->
               <div class="mt-6 bg-white rounded-lg border border-neutral-200 p-4">
                 <h4 class="text-sm font-medium text-neutral-700 mb-3">Preview</h4>
@@ -2010,19 +2026,19 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        
+
         <!-- Action Buttons - Sticky to bottom of form -->
         <div class="sticky bottom-0 bg-white p-5 border-t border-neutral-200 flex justify-end gap-3 -mx-6 -mb-6 mt-6 rounded-b-lg">
-          <button 
-            @click="toggleEditMode" 
+          <button
+            @click="toggleEditMode"
             class="inline-flex items-center px-4 py-2 border border-neutral-300 text-sm font-medium rounded-md bg-white text-neutral-700 hover:bg-neutral-50 transition-colors"
           >
             <span class="mdi mdi-close text-lg mr-2"></span>
             Cancel
           </button>
-          
-          <button 
-            @click="saveProject" 
+
+          <button
+            @click="saveProject"
             class="inline-flex items-center px-8 py-2 border border-transparent text-sm font-medium rounded-md bg-success-600 text-white hover:bg-success-700 shadow-sm transition-all duration-200"
           >
             <span class="mdi mdi-content-save text-lg mr-2"></span>
@@ -2030,41 +2046,41 @@ onUnmounted(() => {
           </button>
         </div>
       </div>
-      
-      
+
+
       <!-- Tabs Navigation -->
       <div class="border-b border-neutral-200 mb-6">
         <nav class="flex space-x-8">
-          <button 
+          <button
             @click="activeTab = 'overview'"
             :class="[
               'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-              activeTab === 'overview' 
-                ? 'border-primary-600 text-primary-600' 
+              activeTab === 'overview'
+                ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
           >
             <span class="mdi mdi-view-dashboard mr-1"></span>
             Overview
           </button>
-          <button 
+          <button
             @click="activeTab = 'team'"
             :class="[
               'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-              activeTab === 'team' 
-                ? 'border-primary-600 text-primary-600' 
+              activeTab === 'team'
+                ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
           >
             <span class="mdi mdi-account-group mr-1"></span>
             Team
           </button>
-          <button 
+          <button
             v-if="jiraIntegrationActive"
             @click="activeTab = 'jira-issues'"
             :class="[
               'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-              activeTab === 'jira-issues' 
+              activeTab === 'jira-issues'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
@@ -2072,12 +2088,12 @@ onUnmounted(() => {
             <span class="mdi mdi-jira mr-1"></span>
             Jira Issues
           </button>
-          <button 
+          <button
             v-if="jiraIntegrationActive"
             @click="activeTab = 'jira-reports'"
             :class="[
               'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-              activeTab === 'jira-reports' 
+              activeTab === 'jira-reports'
                 ? 'border-green-500 text-green-600'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
@@ -2085,37 +2101,37 @@ onUnmounted(() => {
             <span class="mdi mdi-chart-line mr-1"></span>
             Jira Reports
           </button>
-          <button 
+          <button
             @click="activeTab = 'updates'"
             :class="[
               'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-              activeTab === 'updates' 
-                ? 'border-primary-600 text-primary-600' 
+              activeTab === 'updates'
+                ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
           >
             <span class="mdi mdi-message-text mr-1"></span>
             Updates
           </button>
-          <button 
+          <button
             @click="activeTab = 'files'"
             :class="[
               'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-              activeTab === 'files' 
-                ? 'border-primary-600 text-primary-600' 
+              activeTab === 'files'
+                ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
           >
             <span class="mdi mdi-file-document mr-1"></span>
             Files
           </button>
-          <button 
+          <button
             v-if="hasExternalLinks"
             @click="activeTab = 'links'"
             :class="[
               'py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap',
-              activeTab === 'links' 
-                ? 'border-primary-600 text-primary-600' 
+              activeTab === 'links'
+                ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
             ]"
           >
@@ -2124,23 +2140,23 @@ onUnmounted(() => {
           </button>
         </nav>
       </div>
-      
+
       <!-- Tab Content -->
       <!-- Overview Tab -->
       <div v-if="activeTab === 'overview'" class="bg-white rounded-lg shadow-card p-6">
         <h2 class="text-lg font-medium text-neutral-900 mb-4">Project Details</h2>
-        
+
         <!-- JIRA Integration Section -->
         <div class="mb-6">
-          <JiraProjectLinker 
-            :project="project" 
+          <JiraProjectLinker
+            :project="project"
             @project-updated="fetchProject"
             @project-linked="fetchProject"
             @project-unlinked="fetchProject"
             @project-synced="fetchProject"
           />
         </div>
-        
+
         <!-- Main Info Cards with Animation -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <!-- Main Project Info -->
@@ -2168,7 +2184,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- Status Info -->
           <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow-lg p-5 border-l-4 border-accent-500 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
             <div class="flex items-start justify-between">
@@ -2185,7 +2201,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- Responsibility Info -->
           <div class="bg-gradient-to-br from-white to-neutral-50 rounded-xl shadow-lg p-5 border-l-4 border-success-500 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
             <div class="flex items-start justify-between">
@@ -2217,12 +2233,12 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        
+
         <!-- Collapsible Sections - Progressive Disclosure -->
-        
+
         <!-- Project Description Section (Expandable) -->
         <div class="mb-6">
-          <button 
+          <button
             @click="projectDescriptionExpanded = !projectDescriptionExpanded"
             class="w-full flex items-center justify-between bg-white rounded-lg shadow-sm border border-neutral-200 p-4 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 transition-colors"
           >
@@ -2233,9 +2249,9 @@ onUnmounted(() => {
               <h3 class="text-md font-semibold text-neutral-800">Project Description Details</h3>
             </div>
             <span class="mdi text-lg" :class="projectDescriptionExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></span></button>
-          
-          <div 
-            v-show="projectDescriptionExpanded" 
+
+          <div
+            v-show="projectDescriptionExpanded"
             class="bg-white rounded-b-lg shadow-md border-x border-b border-neutral-200 p-5 mt-1 transition-all duration-300"
           >
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
@@ -2246,7 +2262,7 @@ onUnmounted(() => {
                 </h4>
                 <p class="text-neutral-700 bg-white p-3 rounded-md border border-neutral-100">{{ project.remarks || 'No remarks provided' }}</p>
               </div>
-              
+
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200">
                 <h4 class="text-sm font-semibold text-neutral-800 mb-2 flex items-center">
                   <span class="mdi mdi-clipboard-text-outline text-primary-600 mr-2"></span>
@@ -2255,7 +2271,7 @@ onUnmounted(() => {
                 <p class="text-neutral-700 bg-white p-3 rounded-md border border-neutral-100">{{ project.notes || 'No notes provided' }}</p>
               </div>
             </div>
-            
+
             <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200">
               <h4 class="text-sm font-semibold text-neutral-800 mb-2 flex items-center">
                 <span class="mdi mdi-message-processing-outline text-primary-600 mr-2"></span>
@@ -2265,10 +2281,10 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        
+
         <!-- Blockers & Feedback Section (Expandable) -->
         <div class="mb-6">
-          <button 
+          <button
             @click="blockersExpanded = !blockersExpanded"
             class="w-full flex items-center justify-between bg-white rounded-lg shadow-sm border border-neutral-200 p-4 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 transition-colors"
             :class="{'border-error-300': project.blockers}"
@@ -2286,9 +2302,9 @@ onUnmounted(() => {
             </div>
             <span class="mdi text-lg" :class="blockersExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></span>
           </button>
-          
-          <div 
-            v-show="blockersExpanded" 
+
+          <div
+            v-show="blockersExpanded"
             class="bg-white rounded-b-lg shadow-md border-x border-b border-neutral-200 p-5 mt-1 transition-all duration-300"
           >
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2304,7 +2320,7 @@ onUnmounted(() => {
                   {{ project.blockers || 'No blockers reported' }}
                 </div>
               </div>
-              
+
               <div class="bg-neutral-50 rounded-lg p-5 transition-all duration-200">
                 <h4 class="text-sm font-semibold text-neutral-800 mb-2 flex items-center">
                   <span class="mdi mdi-message-reply text-accent-600 mr-2"></span>
@@ -2315,10 +2331,10 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        
+
         <!-- External Links Section (Expandable) -->
         <div v-if="hasExternalLinks" class="mb-6">
-          <button 
+          <button
             @click="externalLinksExpanded = !externalLinksExpanded"
             class="w-full flex items-center justify-between bg-white rounded-lg shadow-sm border border-neutral-200 p-4 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 transition-colors"
           >
@@ -2330,14 +2346,14 @@ onUnmounted(() => {
             </div>
             <span class="mdi text-lg" :class="externalLinksExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></span>
           </button>
-          
-          <div 
-            v-show="externalLinksExpanded" 
+
+          <div
+            v-show="externalLinksExpanded"
             class="bg-white rounded-b-lg shadow-md border-x border-b border-neutral-200 p-5 mt-1 transition-all duration-300"
           >
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               <!-- GitHub Repository -->
-              <div v-if="project.externalLinks.githubRepo" 
+              <div v-if="project.externalLinks.githubRepo"
                   class="bg-neutral-50 p-4 rounded-lg border border-l-4 border-l-neutral-800 transition-all duration-200 hover:shadow-md"
                   @click="openExternalLink(project.externalLinks.githubRepo)"
                   role="link"
@@ -2354,9 +2370,9 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-              
+
               <!-- Figma Design -->
-              <div v-if="project.externalLinks.figmaLink" 
+              <div v-if="project.externalLinks.figmaLink"
                   class="bg-neutral-50 p-4 rounded-lg border border-l-4 border-l-pink-500 transition-all duration-200 hover:shadow-md"
                   @click="openExternalLink(project.externalLinks.figmaLink)"
                   role="link"
@@ -2373,9 +2389,9 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-              
+
               <!-- Jira Project -->
-              <div v-if="project.externalLinks.jiraProject" 
+              <div v-if="project.externalLinks.jiraProject"
                   class="bg-neutral-50 p-4 rounded-lg border border-l-4 border-l-blue-500 transition-all duration-200 hover:shadow-md"
                   @click="openExternalLink(project.externalLinks.jiraProject)"
                   role="link"
@@ -2395,10 +2411,10 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        
+
         <!-- Team Information Section (Expandable) -->
         <div class="mb-6">
-          <button 
+          <button
             @click="teamInfoExpanded = !teamInfoExpanded"
             class="w-full flex items-center justify-between bg-white rounded-lg shadow-sm border border-neutral-200 p-4 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 transition-colors"
           >
@@ -2410,9 +2426,9 @@ onUnmounted(() => {
             </div>
             <span class="mdi text-lg" :class="teamInfoExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></span>
           </button>
-          
-          <div 
-            v-show="teamInfoExpanded" 
+
+          <div
+            v-show="teamInfoExpanded"
             class="bg-white rounded-b-lg shadow-md border-x border-b border-neutral-200 p-5 mt-1 transition-all duration-300"
           >
             <!-- Team Members -->
@@ -2423,7 +2439,7 @@ onUnmounted(() => {
                   <p class="text-sm text-neutral-500">Project lead and responsible person information is displayed in the Team tab.</p>
                 </div>
               </div>
-              
+
               <div>
                 <h4 class="text-sm font-medium text-neutral-600 mb-2">Team Members</h4>
                 <div class="bg-neutral-50 p-4 rounded-lg">
@@ -2431,10 +2447,10 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            
+
             <!-- Simplified redirecting message -->
             <div class="mt-4">
-              <button 
+              <button
                 @click="activeTab = 'team'"
                 class="inline-flex items-center px-4 py-2 border border-primary-300 text-sm font-medium rounded-md bg-white text-primary-700 hover:bg-primary-50 transition-colors"
               >
@@ -2444,10 +2460,10 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        
+
         <!-- Timeline Section (Expandable) -->
         <div class="mb-6">
-          <button 
+          <button
             @click="timelineExpanded = !timelineExpanded"
             class="w-full flex items-center justify-between bg-white rounded-lg shadow-sm border border-neutral-200 p-4 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 transition-colors"
             :class="{'border-warning-300': isOverdue}"
@@ -2471,9 +2487,9 @@ onUnmounted(() => {
             </div>
             <span class="mdi text-lg" :class="timelineExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'"></span>
           </button>
-          
-          <div 
-            v-show="timelineExpanded" 
+
+          <div
+            v-show="timelineExpanded"
             class="bg-white rounded-b-lg shadow-md border-x border-b border-neutral-200 p-5 mt-1 transition-all duration-300"
           >
             <!-- Timeline Visualization -->
@@ -2493,7 +2509,7 @@ onUnmounted(() => {
                 <div class="text-xs font-medium">{{ project.endDate }}</div>
               </div>
             </div>
-            
+
             <!-- Date Information -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div class="bg-neutral-50 p-4 rounded-lg flex flex-col justify-between">
@@ -2503,7 +2519,7 @@ onUnmounted(() => {
                   <div class="text-xs text-neutral-500 mt-1">Initially Raised: {{ project.initiallyRaisedOn || project.startDate }}</div>
                 </div>
               </div>
-              
+
               <div class="bg-neutral-50 p-4 rounded-lg flex flex-col justify-between">
                 <h4 class="text-sm font-medium text-neutral-600 mb-2">Project Deadline</h4>
                 <div>
@@ -2513,7 +2529,7 @@ onUnmounted(() => {
                   <div class="text-xs text-neutral-500 mt-1">Expected End Date: {{ project.endDate }}</div>
                 </div>
               </div>
-              
+
               <div class="bg-neutral-50 p-4 rounded-lg flex flex-col justify-between">
                 <h4 class="text-sm font-medium text-neutral-600 mb-2">Time Tracking</h4>
                 <div class="flex items-center">
@@ -2536,7 +2552,7 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      
+
       <!-- Updates Tab -->
       <div v-if="activeTab === 'updates'" class="bg-white rounded-lg shadow-card p-6">
         <div class="flex justify-between items-center mb-4">
@@ -2548,7 +2564,7 @@ onUnmounted(() => {
             </span>
           </div>
         </div>
-        
+
         <!-- Daily Update Required Alert -->
         <div v-if="needsDailyUpdate" class="mb-6 bg-warning-50 border-l-4 border-warning-500 p-4 rounded-md">
           <div class="flex">
@@ -2563,14 +2579,14 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        
+
         <!-- Team Members Update Status -->
         <div class="mb-6 bg-neutral-50 p-4 rounded-md">
           <h3 class="text-md font-medium text-neutral-800 mb-3 flex items-center">
             <span class="mdi mdi-account-clock text-primary-600 mr-2"></span>
             Team Update Status
           </h3>
-          
+
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <!-- Team members who need updates -->
             <div v-for="memberId in missingUpdates" :key="`missing-${memberId}`"
@@ -2584,7 +2600,7 @@ onUnmounted(() => {
               </div>
               <span class="mdi mdi-clock-alert-outline text-warning-500 ml-2"></span>
             </div>
-            
+
             <!-- Team members who have updated -->
             <div v-for="[memberId, date] in Object.entries(lastUpdateByUser)" :key="`updated-${memberId}`"
               class="flex items-center p-3 bg-white border border-success-200 rounded-lg text-sm"
@@ -2600,35 +2616,35 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        
+
         <!-- Add Update Form -->
         <div v-if="canEdit" class="mb-6 bg-neutral-50 p-4 rounded-md">
           <h3 class="text-md font-medium text-neutral-800 mb-2 flex items-center">
             <span class="mdi mdi-message-plus-outline text-primary-600 mr-2"></span>
             Add New Update
           </h3>
-          
+
           <!-- Update Type Toggle -->
           <div class="flex items-center mb-4">
             <span class="text-sm text-neutral-600 mr-3">Update Type:</span>
             <div class="flex items-center space-x-4">
               <label class="inline-flex items-center cursor-pointer">
-                <input 
-                  type="radio" 
-                  class="form-radio h-4 w-4 text-primary-600 transition duration-150 ease-in-out" 
-                  name="update-type" 
-                  :value="'regular'" 
+                <input
+                  type="radio"
+                  class="form-radio h-4 w-4 text-primary-600 transition duration-150 ease-in-out"
+                  name="update-type"
+                  :value="'regular'"
                   v-model="updateType"
                 />
                 <span class="ml-2 text-sm text-neutral-700">Regular Update</span>
               </label>
-              
+
               <label class="inline-flex items-center cursor-pointer">
-                <input 
-                  type="radio" 
-                  class="form-radio h-4 w-4 text-success-600 transition duration-150 ease-in-out" 
-                  name="update-type" 
-                  :value="'daily'" 
+                <input
+                  type="radio"
+                  class="form-radio h-4 w-4 text-success-600 transition duration-150 ease-in-out"
+                  name="update-type"
+                  :value="'daily'"
                   v-model="updateType"
                 />
                 <span class="ml-2 text-sm text-neutral-700">
@@ -2638,18 +2654,18 @@ onUnmounted(() => {
               </label>
             </div>
           </div>
-          
+
           <div class="mb-3">
-            <textarea 
-              v-model="newUpdate" 
-              :placeholder="updateType === 'daily' ? 'Enter your daily progress update...' : 'Enter project update...'" 
-              rows="3" 
+            <textarea
+              v-model="newUpdate"
+              :placeholder="updateType === 'daily' ? 'Enter your daily progress update...' : 'Enter project update...'"
+              rows="3"
               class="block w-full rounded-md border-neutral-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
               :class="{ 'border-warning-300 ring-1 ring-warning-500': updateType === 'daily' && needsDailyUpdate }"
               :disabled="isSubmittingUpdate"
             ></textarea>
           </div>
-          
+
           <!-- Suggestions for daily updates -->
           <div v-if="updateType === 'daily'" class="mb-3 text-sm text-neutral-600">
             <p class="font-medium mb-1">Suggested daily update format:</p>
@@ -2660,17 +2676,17 @@ onUnmounted(() => {
               <li>Estimated completion percentage of your assigned tasks</li>
             </ul>
           </div>
-          
+
           <div class="flex justify-end">
-            <button 
-              @click="addUpdate" 
+            <button
+              @click="addUpdate"
               :disabled="!newUpdate.trim() || isSubmittingUpdate"
               :class="[
                 'inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm',
                 (!newUpdate.trim() || isSubmittingUpdate)
                   ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
-                  : updateType === 'daily' 
-                    ? 'bg-success-600 text-white hover:bg-success-700' 
+                  : updateType === 'daily'
+                    ? 'bg-success-600 text-white hover:bg-success-700'
                     : 'bg-primary-600 text-white hover:bg-primary-700'
               ]"
             >
@@ -2681,10 +2697,10 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
-        
+
         <!-- Updates List -->
         <div v-if="project.updates && project.updates.length > 0" class="space-y-4">
-          <div v-for="(update, index) in project.updates" :key="index" 
+          <div v-for="(update, index) in project.updates" :key="index"
               :class="[
                 'p-4 rounded-md',
                 update.type === 'daily' ? 'bg-success-50 border border-success-100' : 'bg-neutral-50'
@@ -2693,7 +2709,7 @@ onUnmounted(() => {
               <div class="flex items-center">
                 <span class="font-medium text-neutral-900">{{ update.author }}</span>
                 <span class="text-neutral-500 text-sm ml-2">{{ update.date }}</span>
-                <span v-if="update.type === 'daily'" 
+                <span v-if="update.type === 'daily'"
                   class="ml-2 bg-success-100 text-success-800 text-xs px-2 py-0.5 rounded-full flex items-center">
                   <span class="mdi mdi-calendar-check text-xs mr-1"></span>
                   Daily Update
@@ -2703,7 +2719,7 @@ onUnmounted(() => {
             <p class="text-neutral-700">{{ update.content }}</p>
           </div>
         </div>
-        
+
         <!-- No Updates -->
         <div v-else class="text-center py-8 text-neutral-500">
           <span class="mdi mdi-message-text-outline text-4xl block mb-2"></span>
@@ -2713,14 +2729,14 @@ onUnmounted(() => {
           </p>
         </div>
       </div>
-      
+
       <!-- Files Tab -->
       <div v-if="activeTab === 'files'" class="bg-white rounded-lg shadow-card p-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-medium text-neutral-900">Project Files</h2>
-          <button 
+          <button
             v-if="canEdit"
-            @click="$refs.fileInput.click()" 
+            @click="$refs.fileInput.click()"
             class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700"
             :disabled="uploadingFile"
           >
@@ -2728,27 +2744,27 @@ onUnmounted(() => {
             <span v-else class="mdi mdi-upload text-lg mr-1"></span>
             {{ uploadingFile ? 'Uploading...' : 'Upload File' }}
           </button>
-          
+
           <!-- Hidden file input -->
-          <input 
-            ref="fileInput" 
-            type="file" 
-            class="hidden" 
+          <input
+            ref="fileInput"
+            type="file"
+            class="hidden"
             @change="handleFileSelect"
           />
         </div>
-        
+
         <!-- File upload progress -->
         <div v-if="uploadingFile" class="mb-4">
           <div class="w-full bg-neutral-200 rounded-full h-2.5 mb-1">
-            <div 
+            <div
               class="bg-primary-600 h-2.5 rounded-full"
               :style="`width: ${uploadProgress}%`"
             ></div>
           </div>
           <p class="text-sm text-neutral-600">Uploading {{ selectedFile?.name }}... {{ uploadProgress }}%</p>
         </div>
-        
+
         <!-- Selected file - awaiting upload -->
         <div v-if="selectedFile && !uploadingFile" class="mb-4 bg-neutral-50 p-3 rounded-md flex items-center justify-between">
           <div class="flex items-center">
@@ -2756,21 +2772,21 @@ onUnmounted(() => {
             <span class="text-sm">{{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }})</span>
           </div>
           <div class="flex space-x-2">
-            <button 
-              @click="uploadFile" 
+            <button
+              @click="uploadFile"
               class="text-sm bg-primary-600 text-white px-3 py-1 rounded hover:bg-primary-700"
             >
               Upload
             </button>
-            <button 
-              @click="selectedFile = null" 
+            <button
+              @click="selectedFile = null"
               class="text-sm bg-neutral-200 text-neutral-800 px-3 py-1 rounded hover:bg-neutral-300"
             >
               Cancel
             </button>
           </div>
         </div>
-        
+
         <!-- Files table -->
         <div v-if="project.files && project.files.length > 0" class="overflow-x-auto">
           <table class="min-w-full divide-y divide-neutral-200">
@@ -2797,7 +2813,7 @@ onUnmounted(() => {
               <tr v-for="(file, index) in project.files" :key="index" class="hover:bg-neutral-50">
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
-                    <span 
+                    <span
                       :class="[
                         'mdi text-xl mr-2',
                         file.name.endsWith('.pdf') ? 'mdi-file-pdf-box text-error-600' :
@@ -2824,9 +2840,9 @@ onUnmounted(() => {
                   <button @click="downloadFile(file)" class="text-primary-600 hover:text-primary-900 mr-3">
                     <span class="mdi mdi-download"></span>
                   </button>
-                  <button 
+                  <button
                     v-if="canEdit"
-                    @click="deleteFile(file, index)" 
+                    @click="deleteFile(file, index)"
                     class="text-neutral-600 hover:text-neutral-900"
                   >
                     <span class="mdi mdi-delete"></span>
@@ -2836,7 +2852,7 @@ onUnmounted(() => {
             </tbody>
           </table>
         </div>
-        
+
         <!-- No Files -->
         <div v-else class="text-center py-8 text-neutral-500">
           <span class="mdi mdi-file-document-outline text-4xl block mb-2"></span>
@@ -2851,8 +2867,8 @@ onUnmounted(() => {
           <h2 class="text-lg font-medium text-neutral-900 flex items-center">
             Project Team Members
           </h2>
-          
-          <button 
+
+          <button
             v-if="canEdit && !isEditing"
             @click="toggleEditMode"
             class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700"
@@ -2861,13 +2877,13 @@ onUnmounted(() => {
             Edit Team
           </button>
         </div>
-        
+
         <!-- Team leadership section -->
         <div class="mb-8">
           <h3 class="text-md font-medium text-neutral-700 mb-4 pb-2 border-b border-neutral-200">
             Leadership
           </h3>
-          
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Project Lead Card -->
             <div class="bg-white rounded-xl shadow-sm border border-neutral-100 p-5 transition-all duration-300 hover:shadow-md">
@@ -2887,7 +2903,7 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            
+
             <!-- Responsible Person Card -->
             <div class="bg-white rounded-xl shadow-sm border border-neutral-100 p-5 transition-all duration-300 hover:shadow-md">
               <div class="flex items-center">
@@ -2908,7 +2924,7 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        
+
         <!-- Team members section -->
         <div class="mb-8">
           <div class="flex justify-between items-center mb-4">
@@ -2918,7 +2934,7 @@ onUnmounted(() => {
                 {{ project.team.length }}
               </span>
             </h3>
-            
+
             <div v-if="project.team && project.team.length > 0" class="text-sm">
               <div class="flex items-center gap-1 text-neutral-500">
                 <span class="mdi mdi-account-group"></span>
@@ -2926,10 +2942,10 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <div v-if="project.team && project.team.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <!-- Team member card -->
-            <div v-for="(member, index) in project.team" :key="index" 
+            <div v-for="(member, index) in project.team" :key="index"
               class="bg-white rounded-lg border border-neutral-200 shadow-sm p-4 hover:shadow-md transition-all duration-300">
               <div class="flex items-center">
                 <div class="h-12 w-12 rounded-full bg-neutral-100 flex items-center justify-center flex-shrink-0">
@@ -2939,8 +2955,8 @@ onUnmounted(() => {
                   <div class="font-medium text-neutral-900 truncate">{{ getUserName(member) }}</div>
                   <div class="text-xs text-neutral-500 mt-1">Team Member</div>
                 </div>
-                <div v-if="canEdit && isEditing" 
-                  class="ml-2 p-1 rounded-full hover:bg-neutral-100 cursor-pointer" 
+                <div v-if="canEdit && isEditing"
+                  class="ml-2 p-1 rounded-full hover:bg-neutral-100 cursor-pointer"
                   title="Remove from team"
                 >
                   <span class="mdi mdi-close text-neutral-500 hover:text-error-600"></span>
@@ -2948,7 +2964,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- No team members placeholder -->
           <div v-else class="bg-neutral-50 rounded-lg p-8 text-center">
             <div class="h-16 w-16 rounded-full bg-neutral-200 mx-auto flex items-center justify-center mb-3">
@@ -2961,7 +2977,7 @@ onUnmounted(() => {
             </p>
           </div>
         </div>
-        
+
         <!-- Developers section -->
         <div class="mb-8">
           <div class="flex justify-between items-center mb-4">
@@ -2972,10 +2988,10 @@ onUnmounted(() => {
               </span>
             </h3>
           </div>
-          
+
           <div v-if="project.developers && project.developers.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <!-- Developer card -->
-            <div v-for="(developer, index) in project.developers" :key="index" 
+            <div v-for="(developer, index) in project.developers" :key="index"
               class="bg-white rounded-lg border border-neutral-200 shadow-sm p-4 hover:shadow-md transition-all duration-300">
               <div class="flex items-center">
                 <div class="h-12 w-12 rounded-full bg-success-100 flex items-center justify-center flex-shrink-0">
@@ -2985,8 +3001,8 @@ onUnmounted(() => {
                   <div class="font-medium text-neutral-900 truncate">{{ getUserName(developer) }}</div>
                   <div class="text-xs text-neutral-500 mt-1">Developer</div>
                 </div>
-                <div v-if="canEdit && isEditing" 
-                  class="ml-2 p-1 rounded-full hover:bg-neutral-100 cursor-pointer" 
+                <div v-if="canEdit && isEditing"
+                  class="ml-2 p-1 rounded-full hover:bg-neutral-100 cursor-pointer"
                   title="Remove developer"
                 >
                   <span class="mdi mdi-close text-neutral-500 hover:text-error-600"></span>
@@ -2994,7 +3010,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- No developers placeholder -->
           <div v-else class="bg-neutral-50 rounded-lg p-8 text-center">
             <div class="h-16 w-16 rounded-full bg-neutral-200 mx-auto flex items-center justify-center mb-3">
@@ -3007,28 +3023,28 @@ onUnmounted(() => {
             </p>
           </div>
         </div>
-        
+
         <!-- Team Statistics -->
         <div class="bg-white rounded-xl shadow-md border border-neutral-100 p-5">
           <h3 class="text-md font-medium text-neutral-700 mb-4 flex items-center">
             <span class="mdi mdi-chart-areaspline text-primary-600 mr-2"></span>
             Team Statistics
           </h3>
-          
+
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bg-neutral-50 rounded-lg p-4">
               <div class="text-sm text-neutral-500 mb-1">Total Team Size</div>
               <div class="text-2xl font-bold text-neutral-800">
-                {{ 
-                  (project.team ? project.team.length : 0) + 
-                  (project.developers ? project.developers.length : 0) + 
-                  (project.assignedTo ? 1 : 0) + 
+                {{
+                  (project.team ? project.team.length : 0) +
+                  (project.developers ? project.developers.length : 0) +
+                  (project.assignedTo ? 1 : 0) +
                   (project.responsiblePerson && project.responsiblePerson !== project.assignedTo ? 1 : 0)
                 }}
               </div>
               <div class="mt-2 text-xs text-neutral-500">Combined project staff</div>
             </div>
-            
+
             <div class="bg-neutral-50 rounded-lg p-4">
               <div class="text-sm text-neutral-500 mb-1">Core Team</div>
               <div class="text-2xl font-bold text-neutral-800">
@@ -3036,7 +3052,7 @@ onUnmounted(() => {
               </div>
               <div class="mt-2 text-xs text-neutral-500">General team members</div>
             </div>
-            
+
             <div class="bg-neutral-50 rounded-lg p-4">
               <div class="text-sm text-neutral-500 mb-1">Technical Team</div>
               <div class="text-2xl font-bold text-neutral-800">
@@ -3047,14 +3063,14 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      
+
       <!-- External Links Tab Content -->
       <div v-if="activeTab === 'links'" class="bg-white rounded-lg shadow-card p-6">
         <h2 class="text-lg font-medium text-neutral-900 mb-6 flex items-center">
           <span class="mdi mdi-link-variant text-xl text-purple-600 mr-2"></span>
           External Project Links
         </h2>
-        
+
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           <!-- GitHub Repository -->
           <div v-if="project.externalLinks.githubRepo" class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
@@ -3066,9 +3082,9 @@ onUnmounted(() => {
             <div class="text-sm text-neutral-500 bg-neutral-50 p-3 rounded-md mb-4 break-all">
               {{ project.externalLinks.githubRepo }}
             </div>
-            <a 
-              :href="isValidUrl(project.externalLinks.githubRepo) ? project.externalLinks.githubRepo : '#'" 
-              target="_blank" 
+            <a
+              :href="isValidUrl(project.externalLinks.githubRepo) ? project.externalLinks.githubRepo : '#'"
+              target="_blank"
               rel="noopener noreferrer"
               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-neutral-800 hover:bg-neutral-700 focus:outline-none"
               :class="{ 'opacity-50 cursor-not-allowed': !isValidUrl(project.externalLinks.githubRepo) }"
@@ -3078,7 +3094,7 @@ onUnmounted(() => {
               View Repository
             </a>
           </div>
-          
+
           <!-- Figma Design -->
           <div v-if="project.externalLinks.figmaLink" class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
             <div class="h-16 w-16 rounded-xl bg-pink-100 flex items-center justify-center mb-4">
@@ -3089,9 +3105,9 @@ onUnmounted(() => {
             <div class="text-sm text-neutral-500 bg-neutral-50 p-3 rounded-md mb-4 break-all">
               {{ project.externalLinks.figmaLink }}
             </div>
-            <a 
-              :href="isValidUrl(project.externalLinks.figmaLink) ? project.externalLinks.figmaLink : '#'" 
-              target="_blank" 
+            <a
+              :href="isValidUrl(project.externalLinks.figmaLink) ? project.externalLinks.figmaLink : '#'"
+              target="_blank"
               rel="noopener noreferrer"
               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-pink-600 hover:bg-pink-700 focus:outline-none"
               :class="{ 'opacity-50 cursor-not-allowed': !isValidUrl(project.externalLinks.figmaLink) }"
@@ -3101,7 +3117,7 @@ onUnmounted(() => {
               View Design
             </a>
           </div>
-          
+
           <!-- Jira Project -->
           <div v-if="project.externalLinks.jiraProject" class="bg-white rounded-xl shadow-md border border-neutral-100 p-5 transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
             <div class="h-16 w-16 rounded-xl bg-blue-100 flex items-center justify-center mb-4">
@@ -3112,9 +3128,9 @@ onUnmounted(() => {
             <div class="text-sm text-neutral-500 bg-neutral-50 p-3 rounded-md mb-4 break-all">
               {{ project.externalLinks.jiraProject }}
             </div>
-            <a 
-              :href="isValidUrl(project.externalLinks.jiraProject) ? project.externalLinks.jiraProject : '#'" 
-              target="_blank" 
+            <a
+              :href="isValidUrl(project.externalLinks.jiraProject) ? project.externalLinks.jiraProject : '#'"
+              target="_blank"
               rel="noopener noreferrer"
               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
               :class="{ 'opacity-50 cursor-not-allowed': !isValidUrl(project.externalLinks.jiraProject) }"
@@ -3124,9 +3140,9 @@ onUnmounted(() => {
               View Jira Board
             </a>
           </div>
-          
+
           <!-- No external links placeholder -->
-          <div v-if="!project.externalLinks.githubRepo && !project.externalLinks.figmaLink && !project.externalLinks.jiraProject" 
+          <div v-if="!project.externalLinks.githubRepo && !project.externalLinks.figmaLink && !project.externalLinks.jiraProject"
                class="col-span-full bg-neutral-50 rounded-lg p-8 text-center border border-dashed border-neutral-300">
             <div class="h-16 w-16 rounded-full bg-neutral-200 mx-auto flex items-center justify-center mb-3">
               <span class="mdi mdi-link-variant-off text-2xl text-neutral-400"></span>
@@ -3139,7 +3155,7 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      
+
       <!-- Jira Issues Tab -->
       <div v-if="activeTab === 'jira-issues'" class="space-y-6">
         <!-- Jira Integration Status Header -->
@@ -3154,35 +3170,35 @@ onUnmounted(() => {
                 <p class="text-sm text-neutral-600">Track and manage issues from your connected Jira project</p>
               </div>
             </div
-            
+
             <!-- Integration Status Badge -->
             <div class="flex items-center space-x-3">
-              <span v-if="project?.jiraIntegration?.projectKey" 
+              <span v-if="project?.jiraIntegration?.projectKey"
                     class="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
                 <span class="mdi mdi-check-circle mr-1"></span>
                 Reports Active
               </span>
-              <span v-else 
+              <span v-else
                     class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
                 <span class="mdi mdi-alert-circle mr-1"></span>
                 Reports Unavailable
               </span>
             </div>
           </div>
-          
+
           <!-- Quick Info Row -->
           <div class="flex items-center justify-between bg-neutral-50 rounded-lg p-4">
             <div class="flex items-center space-x-4">
               <div class="text-sm">
-                <span class="font-medium">Project Key:</span> 
+                <span class="font-medium">Project Key:</span>
                 {{ project?.jiraIntegration?.projectKey || 'Not set' }}
               </div>
               <div v-if="project?.jiraIntegration?.lastSyncDate" class="text-sm text-neutral-600">
-                <span class="font-medium">Last Updated:</span> 
+                <span class="font-medium">Last Updated:</span>
                 {{ formatTimeAgo(project.jiraIntegration.lastSyncDate) }}
               </div>
             </div>
-            
+
             <div class="flex items-center space-x-2">
               <button v-if="project?.jiraIntegration?.projectKey"
                       @click="syncJiraProject"
@@ -3192,7 +3208,7 @@ onUnmounted(() => {
                 <span :class="['mdi mr-2', isSyncing ? 'mdi-loading mdi-spin' : 'mdi-refresh']"></span>
                 {{ isSyncing ? 'Syncing...' : 'Sync Now' }}
               </button>
-              
+
               <button @click="openJiraProject"
                       v-if="project?.jiraIntegration?.projectKey"
                       class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 focus:outline-none"
@@ -3206,7 +3222,7 @@ onUnmounted(() => {
 
         <!-- Jira Issues Dashboard - Only show if connected -->
         <div v-if="jiraIntegrationActive">
-          <JiraIssuesDashboard 
+          <JiraIssuesDashboard
             :project-key="project.jiraIntegration.projectKey"
             :project-id="projectId"
             @issue-synced="handleIssueSynced"
@@ -3221,10 +3237,10 @@ onUnmounted(() => {
           </div>
           <h3 class="text-lg font-medium text-neutral-900 mb-2">Connect to Jira</h3>
           <p class="text-neutral-600 mb-6 max-w-md mx-auto">
-            Link this project to a Jira project to view and manage issues directly from here. 
+            Link this project to a Jira project to view and manage issues directly from here.
             You'll be able to track progress, create issues, and sync data between platforms.
           </p>
-          
+
           <!-- Link to Overview tab where JiraProjectLinker is -->
           <button @click="activeTab = 'overview'"
                   class="inline-flex items-center px-6 py-3 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
@@ -3232,9 +3248,9 @@ onUnmounted(() => {
             <span class="mdi mdi-link-variant text-base mr-2"></span>
             Set Up Jira Integration
           </button>
-          
+
           <div class="mt-6 text-xs text-neutral-500">
-            <p>Need help? Check out our 
+            <p>Need help? Check out our
               <a href="#" class="text-blue-600 hover:text-blue-700 underline">integration guide</a>
             </p>
           </div>
@@ -3255,35 +3271,35 @@ onUnmounted(() => {
                 <p class="text-sm text-neutral-600">Comprehensive metrics and insights from your Jira project</p>
               </div>
             </div>
-            
+
             <!-- Integration Status Badge -->
             <div class="flex items-center space-x-3">
-              <span v-if="project?.jiraIntegration?.projectKey" 
+              <span v-if="project?.jiraIntegration?.projectKey"
                     class="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
                 <span class="mdi mdi-check-circle mr-1"></span>
                 Reports Active
               </span>
-              <span v-else 
+              <span v-else
                     class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
                 <span class="mdi mdi-alert-circle mr-1"></span>
                 Reports Unavailable
               </span>
             </div>
           </div>
-          
+
           <!-- Quick Info Row -->
           <div class="flex items-center justify-between bg-neutral-50 rounded-lg p-4">
             <div class="flex items-center space-x-4">
               <div class="text-sm">
-                <span class="font-medium">Data Source:</span> 
+                <span class="font-medium">Data Source:</span>
                 {{ project?.jiraIntegration?.projectKey || 'No Jira connection' }}
               </div>
               <div v-if="project?.jiraIntegration?.lastSyncDate" class="text-sm text-neutral-600">
-                <span class="font-medium">Last Updated:</span> 
+                <span class="font-medium">Last Updated:</span>
                 {{ formatTimeAgo(project.jiraIntegration.lastSyncDate) }}
               </div>
             </div>
-            
+
             <div class="flex items-center space-x-2">
               <button v-if="project?.jiraIntegration?.projectKey"
                       @click="syncJiraProject"
@@ -3299,7 +3315,7 @@ onUnmounted(() => {
 
         <!-- Jira Reports Dashboard - Only show if connected -->
         <div v-if="jiraIntegrationActive">
-          <JiraReportsDashboard 
+          <JiraReportsDashboard
             :project="project"
           />
         </div>
@@ -3311,10 +3327,10 @@ onUnmounted(() => {
           </div>
           <h3 class="text-lg font-medium text-neutral-900 mb-2">Connect to Jira for Reports</h3>
           <p class="text-neutral-600 mb-6 max-w-md mx-auto">
-            To view comprehensive reports and analytics, you need to connect this project to Jira first. 
+            To view comprehensive reports and analytics, you need to connect this project to Jira first.
             Once connected, you'll get detailed insights including burndown charts, velocity metrics, and issue analytics.
           </p>
-          
+
           <!-- Link to Overview tab where JiraProjectLinker is -->
           <button @click="activeTab = 'overview'"
                   class="inline-flex items-center px-6 py-3 text-sm font-medium rounded-md bg-green-600 text-white hover:bg-green-700 shadow-sm"
@@ -3322,7 +3338,7 @@ onUnmounted(() => {
             <span class="mdi mdi-link-variant text-base mr-2"></span>
             Set Up Jira Integration
           </button>
-          
+
           <div class="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
             <h4 class="text-sm font-medium text-green-800 mb-2">Reports will include:</h4>
             <ul class="text-sm text-green-700 space-y-1">

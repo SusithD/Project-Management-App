@@ -9,33 +9,23 @@ let db: Db | null = null
 // Get MongoDB connection details from config
 const config = useRuntimeConfig()
 
-// Docker MongoDB connection string
-const DOCKER_MONGO_URI = 'mongodb://localhost:27017'
+// Use provided URI or fallback to localhost
+const MONGO_URI = config.mongodb?.uri || process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017'
 
-// Use fallback to direct connection string if DNS SRV lookup fails
-const MONGO_URI = config.mongodb?.uri || process.env.MONGODB_URI || process.env.MONGO_URI || DOCKER_MONGO_URI
-
-// For local development, use Docker MongoDB as primary connection
+// Database name
 const MONGO_DB = config.mongodb?.dbName || process.env.MONGO_DB || 'project_management'
 
-// Connection options with better defaults for reliability
+// Connection options
 const CONNECTION_OPTIONS = {
   retryWrites: true,
-  connectTimeoutMS: 5000, // Lower timeout to fail faster
+  connectTimeoutMS: 5000,
   socketTimeoutMS: 30000,
   maxPoolSize: 50,
   waitQueueTimeoutMS: 10000,
   serverApi: ServerApiVersion.v1,
   directConnection: false,
   retryReads: true,
-  serverSelectionTimeoutMS: 5000, // Lower timeout for faster fallback
-}
-
-// More reliable local connection options
-const LOCAL_CONNECTION_OPTIONS = {
-  ...CONNECTION_OPTIONS,
-  directConnection: true, // Better for local connections
-  serverSelectionTimeoutMS: 2000,
+  serverSelectionTimeoutMS: 5000,
 }
 
 /**
@@ -48,84 +38,47 @@ export async function connectToDatabase() {
   }
 
   let connectionError = null;
-
-  // Try connecting to Docker MongoDB first
   try {
-    console.log(`Attempting to connect to Docker MongoDB at ${DOCKER_MONGO_URI}...`)
-    
-    client = new MongoClient(DOCKER_MONGO_URI, LOCAL_CONNECTION_OPTIONS)
+    console.log(`Attempting to connect to MongoDB at ${MONGO_URI}...`)
+    client = new MongoClient(MONGO_URI, CONNECTION_OPTIONS)
     await client.connect()
-    
+
     // Test the connection with a ping
     await client.db("admin").command({ ping: 1 });
-    console.log("Docker MongoDB ping successful, connection is working");
-    
+    console.log("MongoDB ping successful, connection is working")
+
     db = client.db(MONGO_DB)
     await setupCollections(db)
-    
-    console.log(`Connected to Docker MongoDB database: ${MONGO_DB}`)
+
+    console.log(`Connected to MongoDB database: ${MONGO_DB}`)
     return { db, client }
   } catch (error: any) {
-    console.error('Failed to connect to Docker MongoDB:', error.message || error)
-    connectionError = error;
-    
-    // Close the failed connection before trying a new one
+    console.error('Failed to connect to MongoDB:', error.message || error)
+    connectionError = error
+
+    // Close the failed connection
     if (client) {
       try {
-        await client.close();
+        await client.close()
       } catch (closeError) {
-        console.warn("Error closing failed Docker connection:", closeError);
+        console.warn("Error closing failed MongoDB connection:", closeError)
       }
-      client = null;
+      client = null
     }
-  }
 
-  // Try connecting to MongoDB Atlas as fallback
-  if (MONGO_URI !== DOCKER_MONGO_URI) {
-    try {
-      console.log(`Attempting to connect to MongoDB Atlas at ${MONGO_URI}...`)
-      
-      client = new MongoClient(MONGO_URI, CONNECTION_OPTIONS)
-      await client.connect()
-      
-      // Test the connection with a ping
-      await client.db("admin").command({ ping: 1 });
-      console.log("Atlas MongoDB ping successful, connection is working");
-      
-      db = client.db(MONGO_DB)
-      await setupCollections(db)
-      
-      console.log(`Connected to MongoDB Atlas database: ${MONGO_DB}`)
-      return { db, client }
-    } catch (error: any) {
-      console.error('Failed to connect to MongoDB Atlas:', error.message || error)
-      connectionError = error;
-      
-      // Close the failed connection
-      if (client) {
-        try {
-          await client.close();
-        } catch (closeError) {
-          console.warn("Error closing failed Atlas connection:", closeError);
-        }
-        client = null;
-      }
-    }
-  }
-    
-  // Provide a more helpful error message
-  const errorMessage = `
-MongoDB Connection Error: Unable to connect to either Docker MongoDB or MongoDB Atlas.
+    // Provide a more helpful error message
+    const errorMessage = `
+MongoDB Connection Error: Unable to connect to MongoDB.
 
 Please check the following:
-1. Is Docker running with MongoDB container? Check with: docker ps
-2. Is MongoDB Atlas connection string correct? Current: ${MONGO_URI}
-3. Do you have network connectivity?
-4. Are your MongoDB credentials valid?
+1. Is the MongoDB connection string correct? Current: ${MONGO_URI}
+2. Do you have network connectivity?
+3. Are your MongoDB credentials valid?
 
 Original error: ${connectionError?.message || connectionError || 'Unknown error'}
-`;
-  throw new Error(errorMessage);
+`
+    throw new Error(errorMessage)
+  }
 }
 
 /**
@@ -149,7 +102,7 @@ async function setupCollections(db: Db) {
         projectCollection.createIndex({ assignedTo: 1 }),
         projectCollection.createIndex({ priority: 1 }),
         projectCollection.createIndex({ category: 1 })
-      ]);
+      ])
     }
     
     // Setup users collection

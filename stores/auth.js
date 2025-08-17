@@ -346,6 +346,54 @@ export const useAuthStore = defineStore('auth', {
       }
       
       return true;
+    },
+    
+    // Set demo user (bypasses OAuth)
+    setDemoUser(userData) {
+      try {
+        // Set demo user data
+        this.user = {
+          id: userData.id,
+          displayName: userData.name,
+          name: userData.name,
+          mail: userData.email,
+          userPrincipalName: userData.email,
+          avatar: userData.avatar,
+          department: userData.department,
+          skills: userData.skills,
+          availability: userData.availability
+        };
+        
+        this.isAuthenticated = true;
+        this.role = userData.role;
+        this.roleName = userData.roleName;
+        
+        // Set permissions based on role
+        if (ROLES[userData.role]) {
+          this.permissions = ROLES[userData.role].permissions;
+        } else {
+          this.permissions = [];
+        }
+        
+        // Set demo session expiry (24 hours)
+        this.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        
+        // Set last activity timestamp
+        this.updateLastActivity();
+        
+        // Persist state to localStorage
+        this.persistState();
+        
+        console.log('Demo user set successfully:', userData.name);
+      } catch (error) {
+        console.error('Error setting demo user:', error);
+        throw error;
+      }
+    },
+    
+    // Check if current user is a demo user
+    isDemoUser() {
+      return this.user?.mail?.includes('@demo.com') || false;
     }
   }
 });

@@ -21,133 +21,134 @@ export async function seedUsers() {
     const users: User[] = [
       {
         id: 'mb001',
-        name: 'Madhushika Bandara',
-        email: 'mbandara@Coveragex.com',
+        name: 'Kasun Perera',
+        email: 'kperera@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'kd001',
-        name: 'Kasun Dissanayaka',
-        email: 'kdissanayaka@Coveragex.com',
+        name: 'Dilusha Fernando',
+        email: 'dfernando@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'sa001',
-        name: 'Susith Alwis',
-        email: 'SAlwis@Coveragex.com',
+        name: 'Ruwan Jayasinghe',
+        email: 'rjayasinghe@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'sk001',
-        name: 'Sajith Kumara',
-        email: 'skumara@Coveragex.com',
+        name: 'Sanjeewa Kumara',
+        email: 'skumara@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'pds001',
-        name: 'Pasindu De Silva',
-        email: 'PDeSilva@Coveragex.com',
+        name: 'Pasindu Silva',
+        email: 'psilva@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'pa001',
-        name: 'Pathum Addarapathirana',
-        email: 'paddarapathirana@Coveragex.com',
+        name: 'Pathum Abeywardena',
+        email: 'pabeywardena@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'rp001',
-        name: 'Rusiru Pallawala',
-        email: 'rpallawala@Coveragex.com',
+        name: 'Ravindu Palliyaguru',
+        email: 'rpalliyaguru@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'ga001',
-        name: 'Gishan Abeysinghe',
-        email: 'gabeysinghe@Coveragex.com',
+        name: 'Gayan Abeysekara',
+        email: 'gabeysekara@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'nt001',
-        name: 'Nipuna Theekshana',
-        email: 'ntheekshana@Coveragex.com',
+        name: 'Nipun Theekshana',
+        email: 'ntheekshana@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'ki001',
-        name: 'Kumal Illankoon',
-        email: 'killankoon@Coveragex.com',
+        name: 'Kushan Illangakoon',
+        email: 'killangakoon@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'gp001',
-        name: 'Gopinath Pakeerathan',
-        email: 'gpakeerathan@Coveragex.com',
+        name: 'Gihan Pathirana',
+        email: 'gpathirana@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'hr001',
-        name: 'Heshadee Ranasinghe',
-        email: 'hranasinghe@Coveragex.com',
+        name: 'Harshani Rathnayake',
+        email: 'hrathnayake@demo.com',
         role: 'Business Analyst',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'rs001',
-        name: 'Rishmi Samaradiwakara',
-        email: 'RSamaradiwakara@Coveragex.com',
+        name: 'Ruwangi Senanayake',
+        email: 'rsenanayake@demo.com',
         role: 'HR',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'pc001',
-        name: 'Pahan Chathuranga',
-        email: 'pchathuranga@Coveragex.com',
+        name: 'Pramud Chathuranga',
+        email: 'pchathuranga@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'ns001',
-        name: 'Nethupama Shavinda',
-        email: 'nshavinda@Coveragex.com',
+        name: 'Nadeesha Samarakoon',
+        email: 'nsamarakoon@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       },
       {
         id: 'sar001',
-        name: 'Sajith Ariyarathna',
-        email: 'sariyarathna@Coveragex.com',
+        name: 'Sasindu Ariyapala',
+        email: 'sariyapala@demo.com',
         role: 'Developer',
         avatar: null,
         createdAt: new Date().toISOString()
       }
     ];
+    
     
     // Insert all users
     await db.collection(COLLECTIONS.USERS).insertMany(users);

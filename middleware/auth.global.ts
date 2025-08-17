@@ -2,8 +2,62 @@
 import { useAuthStore } from '~/stores/auth';
 
 export default defineNuxtRouteMiddleware((to) => {
-  // Skip middleware for login and auth routes
-  if (to.path === '/login' || to.path.startsWith('/auth/')) {
+  // Get runtime config to check demo mode
+  const config = useRuntimeConfig();
+  const isDemoMode = config.public.demoMode === true;
+  
+  console.log('Auth middleware - Demo mode:', isDemoMode, 'Route:', to.path);
+  
+  // In demo mode, redirect original login/auth routes to demo login
+  if (isDemoMode) {
+    const disabledRoutes = [
+      '/login',
+      '/register',
+      '/forgot-password',
+      '/reset-password',
+      '/auth/microsoft',
+      '/oauth/callback'
+    ];
+    
+    if (disabledRoutes.includes(to.path)) {
+      console.log('Redirecting to demo login from:', to.path);
+      return navigateTo('/demo-login');
+    }
+    
+    // Skip middleware for demo login and test pages
+    if (to.path === '/demo-login' || to.path === '/test-demo' || to.path.startsWith('/auth/')) {
+      return;
+    }
+
+    // Skip middleware for admin demo pages (these are for testing/debugging)
+    if (to.path.startsWith('/admin/auth-demo') || to.path.startsWith('/admin/roles') || to.path.startsWith('/admin/email-mappings')) {
+      return;
+    }
+    
+    // For demo mode, check authentication using localStorage (client-side only)
+    if (process.client) {
+      const authStore = useAuthStore();
+      
+      // If user is not authenticated in demo mode, redirect to demo login
+      if (!authStore.isAuthenticated && to.path !== '/demo-login') {
+        console.log('Demo mode: User not authenticated, redirecting to demo login');
+        return navigateTo('/demo-login');
+      }
+      
+      // Validate demo session
+      if (authStore.isAuthenticated && !authStore.validateSession()) {
+        console.log('Demo mode: Session invalid, clearing and redirecting to demo login');
+        authStore.clearUser();
+        return navigateTo('/demo-login');
+      }
+    }
+    
+    // Skip regular auth checks in demo mode
+    return;
+  }
+
+  // Skip middleware for demo login and test pages in production mode
+  if (to.path === '/demo-login' || to.path === '/test-demo' || to.path.startsWith('/auth/')) {
     return;
   }
 
@@ -12,7 +66,7 @@ export default defineNuxtRouteMiddleware((to) => {
     return;
   }
 
-  // Access the auth store
+  // Regular production auth logic
   const authStore = useAuthStore();
   
   // If user is not authenticated, redirect to login page
@@ -20,33 +74,27 @@ export default defineNuxtRouteMiddleware((to) => {
     return navigateTo('/login');
   }
 
-  // Define route-based access control
-  const routePermissions: Record<string, { resource: string; action: string }> = {
-    '/dashboard': { resource: 'projects', action: 'read' },
-    '/projects': { resource: 'projects', action: 'read' },
-    '/users': { resource: 'users', action: 'read' },
-    '/settings': { resource: 'users', action: 'update' }, // Only managers and above
-    '/reports': { resource: 'reports', action: 'read' },
-    '/tasks': { resource: 'tasks', action: 'read' },
-  };
-
-  // Check if current route requires specific permissions
-  const routePermission = routePermissions[to.path];
-  if (routePermission) {
-    if (!authStore.hasPermission(routePermission.resource, routePermission.action)) {
-      // User doesn't have permission, redirect to dashboard with error
-      throw createError({
-        statusCode: 403,
-        statusMessage: `Access denied. You don't have permission to access this page.`
-      });
-    }
+  // Validate session in production mode
+  if (!authStore.validateSession()) {
+    console.log('Production mode: Session invalid, redirecting to login');
+    authStore.clearUser();
+    return navigateTo('/login');
   }
 
-  // Special route restrictions
-  if (to.path.startsWith('/settings') && !authStore.isManager && !authStore.isSuperAdmin) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Settings access is restricted to managers and administrators.'
-    });
+  // Define route-based access control
+  const protectedRoutes = {
+    '/admin': ['SUPER_ADMIN', 'MANAGER'],
+    '/users': ['SUPER_ADMIN', 'MANAGER', 'HR'],
+    '/reports': ['SUPER_ADMIN', 'MANAGER', 'BUSINESS_ANALYST']
+  };
+
+  // Check if current route requires specific roles
+  for (const [route, allowedRoles] of Object.entries(protectedRoutes)) {
+    if (to.path.startsWith(route) && !allowedRoles.includes(authStore.role)) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Access denied. Insufficient permissions.'
+      });
+    }
   }
 });

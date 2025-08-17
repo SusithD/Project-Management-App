@@ -72,31 +72,31 @@ export const ROLES: Record<string, RoleConfig> = {
 // Email to role mapping - This is where you define who gets what role
 export const EMAIL_ROLE_MAPPING: Record<string, keyof typeof ROLES> = {
   // Super Admin
-  'admin@coveragex.com': 'SUPER_ADMIN',
-  'salwis@coveragex.com': 'SUPER_ADMIN',
+  'admin@theqexle.com': 'SUPER_ADMIN',
+  'salwis@theqexle.com': 'SUPER_ADMIN',
   
   // Managers
-  'manager@coveragex.com': 'MANAGER',
-  'project.manager@coveragex.com': 'MANAGER',
-//   'salwis@coveragex.com': 'MANAGER',
+  'manager@theqexle.com': 'MANAGER',
+  'project.manager@theqexle.com': 'MANAGER',
+//   'salwis@theqexle.com': 'MANAGER',
   
   // Business Analysts
-  'ba@coveragex.com': 'BUSINESS_ANALYST',
-  'analyst@coveragex.com': 'BUSINESS_ANALYST',
-//   'slaiws@coveragex.com': 'BUSINESS_ANALYST',
+  'ba@theqexle.com': 'BUSINESS_ANALYST',
+  'analyst@theqexle.com': 'BUSINESS_ANALYST',
+//   'slaiws@theqexle.com': 'BUSINESS_ANALYST',
   
   // Developers
-  'dev@coveragex.com': 'DEVELOPER',
-  'developer@coveragex.com': 'DEVELOPER',
-//   'salwis@coveragex.com': 'DEVELOPER',
+  'dev@theqexle.com': 'DEVELOPER',
+  'developer@theqexle.com': 'DEVELOPER',
+//   'salwis@theqexle.com': 'DEVELOPER',
   
   // Designers
-  'design@coveragex.com': 'DESIGNER',
-  'designer@coveragex.com': 'DESIGNER',
+  'design@theqexle.com': 'DESIGNER',
+  'designer@theqexle.com': 'DESIGNER',
   
   // HR
-  'hr@coveragex.com': 'HR',
-  'people@coveragex.com': 'HR',
+  'hr@theqexle.com': 'HR',
+  'people@theqexle.com': 'HR',
 };
 
 // Default role for users not in the mapping

@@ -10,7 +10,7 @@
           <p class="text-sm text-neutral-600">Manage and track JIRA issues for {{ projectKey }}</p>
         </div>
       </div>
-      
+
       <div class="flex items-center space-x-3">
         <!-- View Toggle -->
         <div class="flex bg-neutral-100 rounded-lg p-1">
@@ -44,7 +44,7 @@
         </div>
 
         <!-- Status Filter -->
-        <select 
+        <select
           v-model="selectedStatus"
           @change="loadIssues"
           class="px-3 py-2 text-sm border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -55,7 +55,7 @@
           <option value="Done">Done</option>
           <option value="Blocked">Blocked</option>
         </select>
-        
+
         <!-- Refresh Button -->
         <button
           @click="loadIssues"
@@ -66,7 +66,7 @@
           <span v-else class="mdi mdi-refresh text-base mr-1"></span>
           {{ loading ? 'Loading...' : 'Refresh' }}
         </button>
-        
+
         <!-- Create Issue Button -->
         <button
           @click="showCreateIssueModal = true"
@@ -156,15 +156,15 @@
                     {{ issue.issueType }}
                   </span>
                 </div>
-                
+
                 <!-- Issue Title -->
                 <h4 class="font-medium text-neutral-900 mb-2">{{ issue.summary }}</h4>
-                
+
                 <!-- Issue Description -->
                 <p v-if="issue.description" class="text-sm text-neutral-600 mb-3 line-clamp-2">
                   {{ stripHtml(issue.description) }}
                 </p>
-                
+
                 <!-- Issue Meta -->
                 <div class="flex items-center text-xs text-neutral-500 space-x-4">
                   <div v-if="issue.assignee" class="flex items-center">
@@ -181,7 +181,7 @@
                   </div>
                 </div>
               </div>
-              
+
               <!-- Actions -->
               <div class="flex items-center space-x-2 ml-4">
                 <button
@@ -380,21 +380,21 @@
                   <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" stroke-width="12"></circle>
                   <!-- Status segments -->
                   <circle
-                    cx="50" cy="50" r="40" fill="none" 
+                    cx="50" cy="50" r="40" fill="none"
                     stroke="#22c55e" stroke-width="12"
                     :stroke-dasharray="`${(stats.done / stats.total) * 251.3} 251.3`"
                     :stroke-dashoffset="0"
                     class="transition-all duration-500"
                   ></circle>
                   <circle
-                    cx="50" cy="50" r="40" fill="none" 
+                    cx="50" cy="50" r="40" fill="none"
                     stroke="#f59e0b" stroke-width="12"
                     :stroke-dasharray="`${(stats.inProgress / stats.total) * 251.3} 251.3`"
                     :stroke-dashoffset="`-${(stats.done / stats.total) * 251.3}`"
                     class="transition-all duration-500"
                   ></circle>
                   <circle
-                    cx="50" cy="50" r="40" fill="none" 
+                    cx="50" cy="50" r="40" fill="none"
                     stroke="#eab308" stroke-width="12"
                     :stroke-dasharray="`${(stats.todo / stats.total) * 251.3} 251.3`"
                     :stroke-dashoffset="`-${((stats.done + stats.inProgress) / stats.total) * 251.3}`"
@@ -543,9 +543,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useNotificationsStore } from '~/stores/notifications'
-import { useAuthStore } from '~/stores/auth'
+import { ref, computed, onMounted } from 'vue';
+import { useNotificationsStore } from '~/stores/notifications';
+import { useAuthStore } from '~/stores/auth';
 
 const props = defineProps({
   projectKey: {
@@ -627,7 +627,7 @@ const getPriorityColor = (priority) => {
 const generateTimelineData = () => {
   const data = Array(30).fill(0)
   const now = new Date()
-  
+
   issues.value.forEach(issue => {
     const createdDate = new Date(issue.created)
     const daysDiff = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24))
@@ -635,7 +635,7 @@ const generateTimelineData = () => {
       data[29 - daysDiff]++
     }
   })
-  
+
   timelineData.value = data
 }
 
@@ -650,7 +650,7 @@ const stats = computed(() => {
   const todo = issues.value.filter(i => ['To Do', 'Open', 'New'].includes(i.status.name)).length
   const inProgress = issues.value.filter(i => ['In Progress', 'In Review'].includes(i.status.name)).length
   const done = issues.value.filter(i => ['Done', 'Closed', 'Resolved'].includes(i.status.name)).length
-  
+
   return { total, todo, inProgress, done }
 })
 
@@ -662,12 +662,19 @@ const loadIssues = async (append = false) => {
     loading.value = true
     issues.value = []
   }
-  
+
   error.value = null
 
   try {
     const startAt = append ? issues.value.length : 0
-    const response = await fetch(`/api/jira/issues?projectKey=${props.projectKey}&maxResults=${maxResults.value}&startAt=${startAt}`, {
+    const userEmail = authStore.user?.mail || authStore.user?.email;
+    const url = `/api/jira/issues?projectKey=${props.projectKey}&maxResults=${maxResults.value}&startAt=${startAt}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+
+    console.log('[JIRA Issues] API URL:', url);
+    console.log('[JIRA Issues] User email:', userEmail);
+    console.log('[JIRA Issues] Is demo user:', authStore.isDemoUser());
+
+    const response = await fetch(url, {
       headers: {
         'Authorization': authStore.authHeader
       }
@@ -678,14 +685,22 @@ const loadIssues = async (append = false) => {
     }
 
     const data = await response.json()
-    
+    console.log('[JIRA Issues] API response:', data);
+
+    // Handle both response formats (with and without body wrapper)
+    const responseData = data.body || data;
+    const issuesArray = responseData.issues || [];
+
+    console.log('[JIRA Issues] Issues array:', issuesArray);
+    console.log('[JIRA Issues] Issues count:', issuesArray ? issuesArray.length : 0);
+
     if (append) {
-      issues.value.push(...data.body.issues)
+      issues.value.push(...issuesArray)
     } else {
-      issues.value = data.body.issues
+      issues.value = issuesArray
     }
-    
-    hasMore.value = data.body.issues.length === maxResults.value
+
+    hasMore.value = issuesArray.length === maxResults.value
 
     // Generate timeline data after loading issues
     if (!append) {
@@ -747,7 +762,7 @@ const formatDate = (dateStr) => {
   const date = new Date(dateStr)
   const now = new Date()
   const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24))
-  
+
   if (diffDays === 0) return 'Today'
   if (diffDays === 1) return 'Yesterday'
   if (diffDays < 7) return `${diffDays} days ago`
@@ -758,13 +773,22 @@ const formatDate = (dateStr) => {
 const viewIssueInJira = (issueKey) => {
   // Get the Jira base URL from runtime configuration
   const config = useRuntimeConfig();
-  const jiraBaseUrl = config.jira?.baseUrl || config.public.jira?.baseUrl;
-  
-  if (!jiraBaseUrl) {
-    notificationsStore.error('Jira base URL is not configured');
-    return;
+  const authStore = useAuthStore();
+  const isDemoUser = authStore.isDemoUser();
+
+  let jiraBaseUrl;
+
+  // Use demo URL for demo users
+  if (isDemoUser) {
+    jiraBaseUrl = 'https://demo-company.atlassian.net';
+  } else {
+    jiraBaseUrl = config.jira?.baseUrl || config.public.jira?.baseUrl;
+    if (!jiraBaseUrl) {
+      notificationsStore.error('Jira base URL is not configured');
+      return;
+    }
   }
-  
+
   window.open(`${jiraBaseUrl}/browse/${issueKey}`, '_blank')
 }
 

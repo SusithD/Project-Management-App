@@ -29,7 +29,7 @@ const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
 const EMAIL_USER = process.env.EMAIL_USER || '';
 const EMAIL_PASS = process.env.EMAIL_PASS || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || 'noreply@projectmanagement.com';
-const APP_NAME = 'CoverageX Project Management';
+const APP_NAME = 'The qexle Project Management';
 
 // Test recipient email (change this to your email)
 const TEST_EMAIL = process.env.TEST_EMAIL || process.env.EMAIL_USER;

@@ -75,6 +75,16 @@ export const useProjectsStore = defineStore('projects', {
         if (filters.category && filters.category !== 'all') queryParams.append('category', filters.category);
         if (filters.priority && filters.priority !== 'all') queryParams.append('priority', filters.priority);
         
+        // Add user email for demo mode detection
+        if (authStore.userEmail) {
+          queryParams.append('userEmail', authStore.userEmail);
+        }
+        
+        // Modify fetchProjects to include demo projects
+        if (authStore.isDemoMode) {
+          queryParams.append('demo', 'true');
+        }
+        
         // Make API call to fetch projects
         const queryString = queryParams.toString();
         const url = `/api/projects${queryString ? '?' + queryString : ''}`;
@@ -103,6 +113,15 @@ export const useProjectsStore = defineStore('projects', {
       const authStore = useAuthStore();
       
       try {
+        // Modify fetchProjectById to handle demo projects
+        if (authStore.isDemoMode) {
+          const demoProject = DEMO_PROJECTS.find(p => p.id === Number(id) || p.id.toString() === id);
+          if (demoProject) {
+            this.currentProject = demoProject;
+            return;
+          }
+        }
+        
         // Make API call to fetch a single project
         const { data, error } = await useFetch(`/api/projects/${id}`, {
           headers: {
