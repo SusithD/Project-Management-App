@@ -2,8 +2,8 @@
 import { useAuthStore } from '~/stores/auth';
 
 export default defineNuxtRouteMiddleware((to) => {
-  // Skip middleware for login and auth routes
-  if (to.path === '/login' || to.path.startsWith('/auth/')) {
+  // Skip middleware for login, auth routes, demo login, and test pages
+  if (to.path === '/login' || to.path === '/demo-login' || to.path === '/test-demo' || to.path.startsWith('/auth/')) {
     return;
   }
 
