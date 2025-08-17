@@ -1,614 +1,1085 @@
-import { User, Project, ProjectUpdate, ProjectFile } from './schemas';
-import { ROLES } from '../config/roles';
+import { User, Project, ProjectUpdate, ProjectFile } from "./schemas";
+import { ROLES } from "../config/roles";
 
-// Demo Users with different roles
+// Demo Users with Sri Lankan details
 export const DEMO_USERS: User[] = [
   {
-    id: 'demo-admin-001',
-    name: 'Sarah Johnson',
-    email: 'sarah.johnson@demo.com',
-    role: 'SUPER_ADMIN',
-    department: 'IT Management',
-    skills: ['Project Management', 'Leadership', 'Strategic Planning'],
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+    id: "demo-admin-001",
+    name: "Susith Deshan Alwis",
+    email: "susith.alwis@demo.com",
+    role: "SUPER_ADMIN",
+    department: "IT Management",
+    skills: [
+      "Project Management",
+      "Leadership",
+      "Strategic Planning",
+      "Sri Lankan Tech Ecosystem",
+    ],
+    avatar:
+      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
     availability: {
-      status: 'available',
+      status: "available",
       allocatedProjects: 2,
-      workload: 75
+      workload: 75,
     },
-    joinedAt: '2023-01-15T00:00:00.000Z',
+    joinedAt: "2023-01-15T00:00:00.000Z",
     lastActive: new Date().toISOString(),
-    createdAt: '2023-01-15T00:00:00.000Z',
-    updatedAt: new Date().toISOString()
+    createdAt: "2023-01-15T00:00:00.000Z",
+    updatedAt: new Date().toISOString(),
   },
   {
-    id: 'demo-manager-001',
-    name: 'Michael Chen',
-    email: 'michael.chen@demo.com',
-    role: 'MANAGER',
-    department: 'Engineering',
-    skills: ['Team Leadership', 'Agile', 'Technical Architecture'],
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
+    id: "demo-manager-001",
+    name: "Nadeesha Jayawardena",
+    email: "nadeesha.jayawardena@demo.com",
+    role: "MANAGER",
+    department: "Engineering",
+    skills: [
+      "Team Leadership",
+      "Agile",
+      "Technical Architecture",
+      "Sri Lankan Startups",
+    ],
+    avatar:
+      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
     availability: {
-      status: 'available',
+      status: "available",
       allocatedProjects: 3,
-      workload: 85
+      workload: 85,
     },
-    joinedAt: '2023-03-20T00:00:00.000Z',
+    joinedAt: "2023-03-20T00:00:00.000Z",
     lastActive: new Date().toISOString(),
-    createdAt: '2023-03-20T00:00:00.000Z',
-    updatedAt: new Date().toISOString()
+    createdAt: "2023-03-20T00:00:00.000Z",
+    updatedAt: new Date().toISOString(),
   },
   {
-    id: 'demo-ba-001',
-    name: 'Emily Rodriguez',
-    email: 'emily.rodriguez@demo.com',
-    role: 'BUSINESS_ANALYST',
-    department: 'Product Management',
-    skills: ['Requirements Analysis', 'User Research', 'Process Modeling'],
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
+    id: "demo-ba-001",
+    name: "Dilini Perera",
+    email: "dilini.perera@demo.com",
+    role: "BUSINESS_ANALYST",
+    department: "Product Management",
+    skills: [
+      "Requirements Analysis",
+      "User Research",
+      "Process Modeling",
+      "Local Market Insights",
+    ],
+    avatar:
+      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
     availability: {
-      status: 'available',
+      status: "available",
       allocatedProjects: 2,
-      workload: 60
+      workload: 60,
     },
-    joinedAt: '2023-02-10T00:00:00.000Z',
+    joinedAt: "2023-02-10T00:00:00.000Z",
     lastActive: new Date().toISOString(),
-    createdAt: '2023-02-10T00:00:00.000Z',
-    updatedAt: new Date().toISOString()
+    createdAt: "2023-02-10T00:00:00.000Z",
+    updatedAt: new Date().toISOString(),
   },
   {
-    id: 'demo-dev-001',
-    name: 'Alex Thompson',
-    email: 'alex.thompson@demo.com',
-    role: 'DEVELOPER',
-    department: 'Engineering',
-    skills: ['React', 'Node.js', 'TypeScript', 'AWS'],
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+    id: "demo-dev-001",
+    name: "Kavinda Wickramasinghe",
+    email: "kavinda.wickramasinghe@demo.com",
+    role: "DEVELOPER",
+    department: "Engineering",
+    skills: ["React", "Node.js", "TypeScript", "AWS", "Sri Lankan Payments"],
+    avatar:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
     availability: {
-      status: 'available',
+      status: "available",
       allocatedProjects: 2,
-      workload: 70
+      workload: 70,
     },
-    joinedAt: '2023-04-05T00:00:00.000Z',
+    joinedAt: "2023-04-05T00:00:00.000Z",
     lastActive: new Date().toISOString(),
-    createdAt: '2023-04-05T00:00:00.000Z',
-    updatedAt: new Date().toISOString()
+    createdAt: "2023-04-05T00:00:00.000Z",
+    updatedAt: new Date().toISOString(),
   },
   {
-    id: 'demo-dev-002',
-    name: 'Priya Patel',
-    email: 'priya.patel@demo.com',
-    role: 'DEVELOPER',
-    department: 'Engineering',
-    skills: ['Python', 'Django', 'PostgreSQL', 'Docker'],
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
+    id: "demo-dev-002",
+    name: "Ashan Fernando",
+    email: "ashan.fernando@demo.com",
+    role: "DEVELOPER",
+    department: "Engineering",
+    skills: [
+      "Python",
+      "Django",
+      "PostgreSQL",
+      "Docker",
+      "Sri Lankan Data Integration",
+    ],
+    avatar:
+      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
     availability: {
-      status: 'partially_available',
-      reason: 'Working on critical bug fixes',
+      status: "partially_available",
+      reason: "Working on critical bug fixes",
       allocatedProjects: 1,
-      workload: 90
+      workload: 90,
     },
-    joinedAt: '2023-05-12T00:00:00.000Z',
+    joinedAt: "2023-05-12T00:00:00.000Z",
     lastActive: new Date().toISOString(),
-    createdAt: '2023-05-12T00:00:00.000Z',
-    updatedAt: new Date().toISOString()
+    createdAt: "2023-05-12T00:00:00.000Z",
+    updatedAt: new Date().toISOString(),
   },
   {
-    id: 'demo-designer-001',
-    name: 'David Kim',
-    email: 'david.kim@demo.com',
-    role: 'DESIGNER',
-    department: 'Design',
-    skills: ['UI/UX Design', 'Figma', 'Prototyping', 'User Research'],
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
+    id: "demo-designer-001",
+    name: "Sashini Silva",
+    email: "sashini.silva@demo.com",
+    role: "DESIGNER",
+    department: "Design",
+    skills: [
+      "UI/UX Design",
+      "Figma",
+      "Prototyping",
+      "User Research",
+      "Sinhala/Tamil UI Design",
+    ],
+    avatar:
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
     availability: {
-      status: 'available',
+      status: "available",
       allocatedProjects: 2,
-      workload: 65
+      workload: 65,
     },
-    joinedAt: '2023-06-18T00:00:00.000Z',
+    joinedAt: "2023-06-18T00:00:00.000Z",
     lastActive: new Date().toISOString(),
-    createdAt: '2023-06-18T00:00:00.000Z',
-    updatedAt: new Date().toISOString()
+    createdAt: "2023-06-18T00:00:00.000Z",
+    updatedAt: new Date().toISOString(),
   },
   {
-    id: 'demo-hr-001',
-    name: 'Lisa Wang',
-    email: 'lisa.wang@demo.com',
-    role: 'HR',
-    department: 'Human Resources',
-    skills: ['Recruitment', 'Employee Relations', 'HR Policies'],
-    avatar: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=150&h=150&fit=crop&crop=face',
+    id: "demo-hr-001",
+    name: "Chathurika Jayasuriya",
+    email: "chathurika.jayasuriya@demo.com",
+    role: "HR",
+    department: "Human Resources",
+    skills: [
+      "Recruitment",
+      "Employee Relations",
+      "HR Policies",
+      "Sri Lankan Labor Law",
+    ],
+    avatar:
+      "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=150&h=150&fit=crop&crop=face",
     availability: {
-      status: 'available',
+      status: "available",
       allocatedProjects: 1,
-      workload: 50
+      workload: 50,
     },
-    joinedAt: '2023-01-30T00:00:00.000Z',
+    joinedAt: "2023-01-30T00:00:00.000Z",
     lastActive: new Date().toISOString(),
-    createdAt: '2023-01-30T00:00:00.000Z',
-    updatedAt: new Date().toISOString()
-  }
+    createdAt: "2023-01-30T00:00:00.000Z",
+    updatedAt: new Date().toISOString(),
+  },
 ];
 
-// Demo Projects
+// Demo Projects with Sri Lankan context
 export const DEMO_PROJECTS: Project[] = [
   {
     id: 1001,
-    name: 'E-Commerce Platform Redesign',
-    status: 'Ongoing',
-    progress: 65,
-    assignedTo: 'demo-manager-001',
-    startDate: '2024-01-15T00:00:00.000Z',
-    endDate: '2024-06-30T00:00:00.000Z',
-    remarks: 'Complete redesign of the existing e-commerce platform with modern UI/UX',
-    notes: 'Focus on mobile-first design and improved checkout flow',
-    priority: 'High',
-    category: 'Web Development',
-    team: ['demo-dev-001', 'demo-dev-002', 'demo-designer-001'],
-    company: 'TechCorp Inc.',
-    statusPhase: 'Development',
-    deadline: '2024-06-30T00:00:00.000Z',
-    comments: 'Making good progress on the frontend components',
-    developers: ['demo-dev-001', 'demo-dev-002'],
-    blockers: 'Waiting for payment gateway API documentation',
-    responsiblePerson: 'Michael Chen',
-    initiallyRaisedOn: '2024-01-10T00:00:00.000Z',
+    name: "Online Retail Platform Revamp",
+    status: "Ongoing",
+    progress: 60,
+    assignedTo: "demo-manager-001",
+    startDate: "2024-01-15T00:00:00.000Z",
+    endDate: "2024-06-30T00:00:00.000Z",
+    remarks:
+      "Redesigning the Sri Lankan retail platform with Sinhala/Tamil language support",
+    notes: "Mobile-first design, local payment integrations (eZ Cash, mCash)",
+    priority: "High",
+    category: "Web Development",
+    team: ["demo-dev-001", "demo-dev-002", "demo-designer-001"],
+    company: "The Qexle",
+    statusPhase: "Development",
+    deadline: "2024-06-30T00:00:00.000Z",
+    comments: "Progressing well with UI, awaiting payment gateway API",
+    developers: ["demo-dev-001", "demo-dev-002"],
+    blockers: "Integration with LankaQR and mobile payment providers",
+    responsiblePerson: "Susith Deshan Alwis",
+    initiallyRaisedOn: "2024-01-10T00:00:00.000Z",
     pendingDays: 45,
-    feedbackForBlockers: 'API docs expected by next week',
-    createdAt: '2024-01-10T00:00:00.000Z',
+    feedbackForBlockers:
+      "Awaiting updated API documentation from payment provider",
+    createdAt: "2024-01-10T00:00:00.000Z",
     lastUpdated: new Date().toISOString(),
-    createdBy: 'demo-admin-001',
+    createdBy: "demo-admin-001",
     externalLinks: {
-      githubRepo: 'https://github.com/demo/ecommerce-redesign',
-      figmaLink: 'https://figma.com/file/demo-ecommerce',
-      jiraProject: 'ECOMM'
-    }
+      githubRepo: "https://github.com/qexle/retail-platform",
+      figmaLink: "https://figma.com/file/qexle-retail-platform",
+      jiraProject: "RETAILSL",
+    },
   },
   {
     id: 1002,
-    name: 'Mobile Banking App',
-    status: 'Ongoing',
-    progress: 25,
-    assignedTo: 'demo-ba-001',
-    startDate: '2024-03-01T00:00:00.000Z',
-    endDate: '2024-12-31T00:00:00.000Z',
-    remarks: 'New mobile banking application for iOS and Android',
-    notes: 'Must comply with banking regulations and security standards',
-    priority: 'Critical',
-    category: 'Mobile Development',
-    team: ['demo-dev-001', 'demo-dev-002', 'demo-designer-001'],
-    company: 'SecureBank Ltd.',
-    statusPhase: 'Requirements Gathering',
-    deadline: '2024-12-31T00:00:00.000Z',
-    comments: 'Currently gathering security requirements from compliance team',
-    developers: ['demo-dev-001', 'demo-dev-002'],
-    blockers: 'Waiting for security audit approval',
-    responsiblePerson: 'Emily Rodriguez',
-    initiallyRaisedOn: '2024-02-15T00:00:00.000Z',
+    name: "Mobile Banking App - Sri Lanka",
+    status: "Ongoing",
+    progress: 35,
+    assignedTo: "demo-ba-001",
+    startDate: "2024-03-01T00:00:00.000Z",
+    endDate: "2024-12-31T00:00:00.000Z",
+    remarks: "Developing a mobile banking app for Sri Lankan banks",
+    notes: "Compliance with CBSL regulations, integration with local banks",
+    priority: "Critical",
+    category: "Mobile Development",
+    team: ["demo-dev-001", "demo-dev-002", "demo-designer-001"],
+    company: "The Qexle",
+    statusPhase: "Requirements Gathering",
+    deadline: "2024-12-31T00:00:00.000Z",
+    comments: "Consulting with Sampath, Commercial, and BOC for API access",
+    developers: ["demo-dev-001", "demo-dev-002"],
+    blockers: "Waiting for CBSL security clearance",
+    responsiblePerson: "Susith Deshan Alwis",
+    initiallyRaisedOn: "2024-02-15T00:00:00.000Z",
     pendingDays: 15,
-    feedbackForBlockers: 'Security team review in progress',
-    createdAt: '2024-02-15T00:00:00.000Z',
+    feedbackForBlockers: "Security review scheduled with CBSL",
+    createdAt: "2024-02-15T00:00:00.000Z",
     lastUpdated: new Date().toISOString(),
-    createdBy: 'demo-admin-001',
+    createdBy: "demo-admin-001",
     externalLinks: {
-      githubRepo: 'https://github.com/demo/mobile-banking',
-      figmaLink: 'https://figma.com/file/demo-banking',
-      jiraProject: 'BANK'
-    }
+      githubRepo: "https://github.com/qexle/mobile-banking-sl",
+      figmaLink: "https://figma.com/file/qexle-banking-sl",
+      jiraProject: "BANKSL",
+    },
   },
   {
     id: 1003,
-    name: 'API Gateway Implementation',
-    status: 'Completed',
+    name: "API Gateway for Sri Lankan Services",
+    status: "Completed",
     progress: 100,
-    assignedTo: 'demo-dev-001',
-    startDate: '2023-11-01T00:00:00.000Z',
-    endDate: '2024-02-28T00:00:00.000Z',
-    remarks: 'Implemented centralized API gateway for microservices',
-    notes: 'Successfully deployed and monitoring is in place',
-    priority: 'Medium',
-    category: 'Backend Development',
-    team: ['demo-dev-001', 'demo-dev-002'],
-    company: 'TechCorp Inc.',
-    statusPhase: 'Deployed',
-    deadline: '2024-02-28T00:00:00.000Z',
-    comments: 'Project completed successfully with all requirements met',
-    developers: ['demo-dev-001', 'demo-dev-002'],
-    blockers: 'None',
-    responsiblePerson: 'Alex Thompson',
-    initiallyRaisedOn: '2023-10-15T00:00:00.000Z',
+    assignedTo: "demo-dev-001",
+    startDate: "2023-11-01T00:00:00.000Z",
+    endDate: "2024-02-28T00:00:00.000Z",
+    remarks: "Centralized gateway for government and private APIs",
+    notes: "Connected to Registrar of Companies, Inland Revenue, and SLT",
+    priority: "Medium",
+    category: "Backend Development",
+    team: ["demo-dev-001", "demo-dev-002"],
+    company: "The Qexle",
+    statusPhase: "Deployed",
+    deadline: "2024-02-28T00:00:00.000Z",
+    comments: "All integrations verified with live government data",
+    developers: ["demo-dev-001", "demo-dev-002"],
+    blockers: "None",
+    responsiblePerson: "Susith Deshan Alwis",
+    initiallyRaisedOn: "2023-10-15T00:00:00.000Z",
     pendingDays: 0,
-    feedbackForBlockers: 'N/A',
-    createdAt: '2023-10-15T00:00:00.000Z',
-    lastUpdated: '2024-02-28T00:00:00.000Z',
-    createdBy: 'demo-admin-001',
+    feedbackForBlockers: "N/A",
+    createdAt: "2023-10-15T00:00:00.000Z",
+    lastUpdated: "2024-02-28T00:00:00.000Z",
+    createdBy: "demo-admin-001",
     externalLinks: {
-      githubRepo: 'https://github.com/demo/api-gateway',
-      jiraProject: 'API'
-    }
+      githubRepo: "https://github.com/qexle/api-gateway-sl",
+      jiraProject: "APISL",
+      figmaLink: "https://figma.com/file/qexle-api-gateway",
+    },
   },
   {
     id: 1004,
-    name: 'Customer Portal Enhancement',
-    status: 'On Hold',
+    name: "Customer Portal Enhancement - Qexle",
+    status: "On Hold",
     progress: 40,
-    assignedTo: 'demo-manager-001',
-    startDate: '2024-02-01T00:00:00.000Z',
-    endDate: '2024-05-31T00:00:00.000Z',
-    remarks: 'Enhance existing customer portal with new features',
-    notes: 'Project paused due to budget constraints',
-    priority: 'Low',
-    category: 'Web Development',
-    team: ['demo-dev-001', 'demo-designer-001'],
-    company: 'ServiceCorp',
-    statusPhase: 'Development',
-    deadline: '2024-05-31T00:00:00.000Z',
-    comments: 'Project temporarily on hold pending budget approval',
-    developers: ['demo-dev-001'],
-    blockers: 'Budget approval required',
-    responsiblePerson: 'Michael Chen',
-    initiallyRaisedOn: '2024-01-20T00:00:00.000Z',
+    assignedTo: "demo-manager-001",
+    startDate: "2024-02-01T00:00:00.000Z",
+    endDate: "2024-05-31T00:00:00.000Z",
+    remarks: "Adding Sinhala/Tamil support to Qexle portal",
+    notes: "Project paused awaiting new funding from local investors",
+    priority: "Low",
+    category: "Web Development",
+    team: ["demo-dev-001", "demo-designer-001"],
+    company: "The Qexle",
+    statusPhase: "Development",
+    deadline: "2024-05-31T00:00:00.000Z",
+    comments: "Waiting for confirmation from investor group",
+    developers: ["demo-dev-001"],
+    blockers: "Funding approval",
+    responsiblePerson: "Susith Deshan Alwis",
+    initiallyRaisedOn: "2024-01-20T00:00:00.000Z",
     pendingDays: 30,
-    feedbackForBlockers: 'Finance team reviewing budget request',
-    createdAt: '2024-01-20T00:00:00.000Z',
+    feedbackForBlockers: "Investor review meeting next week",
+    createdAt: "2024-01-20T00:00:00.000Z",
     lastUpdated: new Date().toISOString(),
-    createdBy: 'demo-admin-001',
+    createdBy: "demo-admin-001",
     externalLinks: {
-      githubRepo: 'https://github.com/demo/customer-portal',
-      figmaLink: 'https://figma.com/file/demo-portal',
-      jiraProject: 'PORTAL'
-    }
+      githubRepo: "https://github.com/qexle/customer-portal-sl",
+      figmaLink: "https://figma.com/file/qexle-portal-sl",
+      jiraProject: "PORTALSL",
+    },
   },
   {
     id: 1005,
-    name: 'Data Analytics Dashboard',
-    status: 'Ongoing',
-    progress: 80,
-    assignedTo: 'demo-dev-002',
-    startDate: '2024-01-01T00:00:00.000Z',
-    endDate: '2024-04-30T00:00:00.000Z',
-    remarks: 'Real-time analytics dashboard for business intelligence',
-    notes: 'Using React and D3.js for data visualization',
-    priority: 'High',
-    category: 'Data Science',
-    team: ['demo-dev-002', 'demo-ba-001'],
-    company: 'AnalyticsCorp',
-    statusPhase: 'Testing',
-    deadline: '2024-04-30T00:00:00.000Z',
-    comments: 'Final testing phase, preparing for deployment',
-    developers: ['demo-dev-002'],
-    blockers: 'Performance optimization needed for large datasets',
-    responsiblePerson: 'Priya Patel',
-    initiallyRaisedOn: '2023-12-15T00:00:00.000Z',
+    name: "Sri Lankan Data Analytics Dashboard",
+    status: "Ongoing",
+    progress: 85,
+    assignedTo: "demo-dev-002",
+    startDate: "2024-01-01T00:00:00.000Z",
+    endDate: "2024-04-30T00:00:00.000Z",
+    remarks: "Real-time analytics for local businesses and government",
+    notes: "React, D3.js, and Sri Lankan datasets from Census & Statistics",
+    priority: "High",
+    category: "Data Science",
+    team: ["demo-dev-002", "demo-ba-001"],
+    company: "The Qexle",
+    statusPhase: "Testing",
+    deadline: "2024-04-30T00:00:00.000Z",
+    comments: "Final QA with government and enterprise clients",
+    developers: ["demo-dev-002"],
+    blockers: "Need optimizations for large government datasets",
+    responsiblePerson: "Susith Deshan Alwis",
+    initiallyRaisedOn: "2023-12-15T00:00:00.000Z",
     pendingDays: 20,
-    feedbackForBlockers: 'Working on query optimization',
-    createdAt: '2023-12-15T00:00:00.000Z',
+    feedbackForBlockers: "Optimizing queries and sampling for large data",
+    createdAt: "2023-12-15T00:00:00.000Z",
     lastUpdated: new Date().toISOString(),
-    createdBy: 'demo-admin-001',
+    createdBy: "demo-admin-001",
     externalLinks: {
-      githubRepo: 'https://github.com/demo/analytics-dashboard',
-      jiraProject: 'ANALYTICS'
-    }
-  }
+      githubRepo: "https://github.com/qexle/analytics-dashboard-sl",
+      jiraProject: "ANALYTICSSL",
+      figmaLink: "https://figma.com/file/qexle-analytics-dashboard",
+    },
+  },
+  {
+    id: 1006,
+    name: "Digital Onboarding Portal Sri Lanka",
+    status: "Completed",
+    progress: 100,
+    assignedTo: "demo-dev-003",
+    startDate: "2024-02-15T00:00:00.000Z",
+    endDate: "2024-05-20T00:00:00.000Z",
+    remarks: "Automated onboarding for local insurance and banks",
+    notes:
+      "Angular, Node.js, SMS gateway, and Sri Lankan identity verification",
+    priority: "Medium",
+    category: "Web Application",
+    team: ["demo-dev-003", "demo-ui-001"],
+    company: "The Qexle",
+    statusPhase: "Deployment",
+    deadline: "2024-05-20T00:00:00.000Z",
+    comments: "Launched with BOC and Sri Lanka Insurance successfully",
+    developers: ["demo-dev-003"],
+    blockers: "None",
+    responsiblePerson: "Susith Deshan Alwis",
+    initiallyRaisedOn: "2024-01-10T00:00:00.000Z",
+    pendingDays: 0,
+    feedbackForBlockers: "N/A",
+    createdAt: "2024-01-10T00:00:00.000Z",
+    lastUpdated: new Date().toISOString(),
+    createdBy: "demo-admin-001",
+    externalLinks: {
+      githubRepo: "https://github.com/qexle/onboarding-portal-sl",
+      jiraProject: "ONBOARDINGSL",
+      figmaLink: "https://figma.com/file/qexle-onboarding-portal",
+    },
+  },
 ];
 
-// Demo Project Updates
+// Demo Project Updates (unchanged for brevity)
+
 export const DEMO_PROJECT_UPDATES: Record<number, ProjectUpdate[]> = {
   1001: [
     {
-      id: 'update-1001-001',
-      content: 'Completed user authentication module and started working on product catalog component',
-      date: '2024-03-15T10:30:00.000Z',
-      author: 'Alex Thompson',
-      type: 'regular',
-      userId: 'demo-dev-001'
+      id: "update-1001-001",
+      content:
+        "Completed user authentication module and started working on product catalog component",
+      date: "2024-03-15T10:30:00.000Z",
+      author: "Kavinda Wickramasinghe",
+      type: "regular",
+      userId: "demo-dev-001",
     },
     {
-      id: 'update-1001-002',
-      content: 'Design system components finalized and ready for development team',
-      date: '2024-03-14T14:20:00.000Z',
-      author: 'David Kim',
-      type: 'regular',
-      userId: 'demo-designer-001'
+      id: "update-1001-002",
+      content:
+        "Design system components finalized and ready for development team",
+      date: "2024-03-14T14:20:00.000Z",
+      author: "Sashini Silva",
+      type: "regular",
+      userId: "demo-designer-001",
     },
     {
-      id: 'update-1001-003',
-      content: 'Daily standup: Frontend team making good progress, backend API integration starting next week',
-      date: '2024-03-13T09:00:00.000Z',
-      author: 'Michael Chen',
-      type: 'daily',
-      userId: 'demo-manager-001'
-    }
+      id: "update-1001-003",
+      content:
+        "Daily standup: Frontend team making good progress, backend API integration starting next week",
+      date: "2024-03-13T09:00:00.000Z",
+      author: "Nadeesha Jayawardena",
+      type: "daily",
+      userId: "demo-manager-001",
+    },
   ],
   1002: [
     {
-      id: 'update-1002-001',
-      content: 'Completed initial requirements gathering session with stakeholders',
-      date: '2024-03-10T16:45:00.000Z',
-      author: 'Emily Rodriguez',
-      type: 'regular',
-      userId: 'demo-ba-001'
+      id: "update-1002-001",
+      content:
+        "Completed initial requirements gathering session with stakeholders",
+      date: "2024-03-10T16:45:00.000Z",
+      author: "Dilini Perera",
+      type: "regular",
+      userId: "demo-ba-001",
     },
     {
-      id: 'update-1002-002',
-      content: 'Security requirements document submitted for review',
-      date: '2024-03-08T11:15:00.000Z',
-      author: 'Emily Rodriguez',
-      type: 'regular',
-      userId: 'demo-ba-001'
-    }
+      id: "update-1002-002",
+      content: "Security requirements document submitted for review",
+      date: "2024-03-08T11:15:00.000Z",
+      author: "Dilini Perera",
+      type: "regular",
+      userId: "demo-ba-001",
+    },
   ],
   1003: [
     {
-      id: 'update-1003-001',
-      content: 'API Gateway successfully deployed to production environment',
-      date: '2024-02-28T15:30:00.000Z',
-      author: 'Alex Thompson',
-      type: 'regular',
-      userId: 'demo-dev-001'
+      id: "update-1003-001",
+      content: "API Gateway successfully deployed to production environment",
+      date: "2024-02-28T15:30:00.000Z",
+      author: "Kavinda Wickramasinghe",
+      type: "regular",
+      userId: "demo-dev-001",
     },
     {
-      id: 'update-1003-002',
-      content: 'Final testing completed, all endpoints working correctly',
-      date: '2024-02-27T13:20:00.000Z',
-      author: 'Priya Patel',
-      type: 'regular',
-      userId: 'demo-dev-002'
-    }
-  ]
+      id: "update-1003-002",
+      content: "Final testing completed, all endpoints working correctly",
+      date: "2024-02-27T13:20:00.000Z",
+      author: "Ashan Fernando",
+      type: "regular",
+      userId: "demo-dev-002",
+    },
+  ],
 };
 
-// Demo Project Files
+// Demo Project Files (unchanged for brevity)
+
 export const DEMO_PROJECT_FILES: Record<number, ProjectFile[]> = {
   1001: [
     {
-      name: 'Technical_Specification.pdf',
-      size: '2.5 MB',
-      uploadedOn: '2024-01-20T10:00:00.000Z',
-      uploadedBy: 'Michael Chen'
+      name: "Technical_Specification.pdf",
+      size: "2.5 MB",
+      uploadedOn: "2024-01-20T10:00:00.000Z",
+      uploadedBy: "Nadeesha Jayawardena",
     },
     {
-      name: 'UI_Design_Mockups.figma',
-      size: '15.2 MB',
-      uploadedOn: '2024-01-25T14:30:00.000Z',
-      uploadedBy: 'David Kim'
+      name: "UI_Design_Mockups.figma",
+      size: "15.2 MB",
+      uploadedOn: "2024-01-25T14:30:00.000Z",
+      uploadedBy: "Sashini Silva",
     },
     {
-      name: 'API_Documentation.md',
-      size: '45 KB',
-      uploadedOn: '2024-02-01T09:15:00.000Z',
-      uploadedBy: 'Alex Thompson'
-    }
+      name: "API_Documentation.md",
+      size: "45 KB",
+      uploadedOn: "2024-02-01T09:15:00.000Z",
+      uploadedBy: "Kavinda Wickramasinghe",
+    },
   ],
   1002: [
     {
-      name: 'Requirements_Document.pdf',
-      size: '3.1 MB',
-      uploadedOn: '2024-02-20T11:00:00.000Z',
-      uploadedBy: 'Emily Rodriguez'
+      name: "Requirements_Document.pdf",
+      size: "3.1 MB",
+      uploadedOn: "2024-02-20T11:00:00.000Z",
+      uploadedBy: "Dilini Perera",
     },
     {
-      name: 'Security_Requirements.docx',
-      size: '1.8 MB',
-      uploadedOn: '2024-03-05T16:45:00.000Z',
-      uploadedBy: 'Emily Rodriguez'
-    }
+      name: "Security_Requirements.docx",
+      size: "1.8 MB",
+      uploadedOn: "2024-03-05T16:45:00.000Z",
+      uploadedBy: "Dilini Perera",
+    },
   ],
   1003: [
     {
-      name: 'Architecture_Diagram.drawio',
-      size: '2.1 MB',
-      uploadedOn: '2023-11-10T13:20:00.000Z',
-      uploadedBy: 'Alex Thompson'
+      name: "Architecture_Diagram.drawio",
+      size: "2.1 MB",
+      uploadedOn: "2023-11-10T13:20:00.000Z",
+      uploadedBy: "Kavinda Wickramasinghe",
     },
     {
-      name: 'Deployment_Guide.md',
-      size: '28 KB',
-      uploadedOn: '2024-02-25T10:30:00.000Z',
-      uploadedBy: 'Priya Patel'
-    }
-  ]
+      name: "Deployment_Guide.md",
+      size: "28 KB",
+      uploadedOn: "2024-02-25T10:30:00.000Z",
+      uploadedBy: "Ashan Fernando",
+    },
+  ],
 };
 
-// Demo Jira Projects
+// Demo Jira Projects with Sri Lankan context
+// Mock JIRA Configuration for Demo
+export const DEMO_JIRA_CONFIG = {
+  baseUrl: "https://demo-company.atlassian.net",
+  email: "admin@demo.com",
+  projectKey: "DEMO",
+  enabled: true,
+};
+
 export const DEMO_JIRA_PROJECTS = [
   {
-    id: '10001',
-    key: 'ECOMM',
-    name: 'E-Commerce Platform',
-    projectTypeKey: 'software',
-    style: 'classic',
-    isPrivate: false
+    id: "10001",
+    key: "RETAILSL",
+    name: "Retail Platform Sri Lanka",
+    projectTypeKey: "software",
+    style: "classic",
+    isPrivate: false,
   },
   {
-    id: '10002',
-    key: 'BANK',
-    name: 'Mobile Banking App',
-    projectTypeKey: 'software',
-    style: 'classic',
-    isPrivate: false
+    id: "10002",
+    key: "BANKSL",
+    name: "Mobile Banking App Sri Lanka",
+    projectTypeKey: "software",
+    style: "classic",
+    isPrivate: false,
   },
   {
-    id: '10003',
-    key: 'API',
-    name: 'API Gateway',
-    projectTypeKey: 'software',
-    style: 'classic',
-    isPrivate: false
+    id: "10003",
+    key: "APISL",
+    name: "API Gateway Sri Lanka",
+    projectTypeKey: "software",
+    style: "classic",
+    isPrivate: false,
   },
   {
-    id: '10004',
-    key: 'PORTAL',
-    name: 'Customer Portal',
-    projectTypeKey: 'software',
-    style: 'classic',
-    isPrivate: false
+    id: "10004",
+    key: "PORTALSL",
+    name: "Customer Portal Sri Lanka",
+    projectTypeKey: "software",
+    style: "classic",
+    isPrivate: false,
   },
   {
-    id: '10005',
-    key: 'ANALYTICS',
-    name: 'Data Analytics',
-    projectTypeKey: 'software',
-    style: 'classic',
-    isPrivate: false
-  }
+    id: "10005",
+    key: "ANALYTICSSL",
+    name: "Data Analytics Sri Lanka",
+    projectTypeKey: "software",
+    style: "classic",
+    isPrivate: false,
+  },
+  {
+    id: "10006",
+    key: "ONBOARDINGSL",
+    name: "Digital Onboarding Portal Sri Lanka",
+    projectTypeKey: "software",
+    style: "classic",
+    isPrivate: false,
+  },
 ];
 
-// Demo Jira Issues
-export const DEMO_JIRA_ISSUES = {
-  ECOMM: [
-    {
-      id: '10001',
-      key: 'ECOMM-101',
-      summary: 'Implement user authentication system',
-      description: 'Create secure user authentication with JWT tokens and role-based access control',
-      status: { name: 'In Progress', category: 'To Do' },
-      priority: 'High',
-      assignee: {
-        accountId: 'demo-dev-001',
-        displayName: 'Alex Thompson',
-        emailAddress: 'alex.thompson@demo.com'
-      },
-      reporter: {
-        accountId: 'demo-manager-001',
-        displayName: 'Michael Chen',
-        emailAddress: 'michael.chen@demo.com'
-      },
-      created: '2024-01-15T09:00:00.000Z',
-      updated: '2024-03-15T14:30:00.000Z',
-      duedate: '2024-03-30T00:00:00.000Z',
-      issueType: 'Story'
-    },
-    {
-      id: '10002',
-      key: 'ECOMM-102',
-      summary: 'Design product catalog component',
-      description: 'Create responsive product catalog with filtering and search functionality',
-      status: { name: 'To Do', category: 'To Do' },
-      priority: 'Medium',
-      assignee: {
-        accountId: 'demo-dev-001',
-        displayName: 'Alex Thompson',
-        emailAddress: 'alex.thompson@demo.com'
-      },
-      reporter: {
-        accountId: 'demo-designer-001',
-        displayName: 'David Kim',
-        emailAddress: 'david.kim@demo.com'
-      },
-      created: '2024-01-20T10:00:00.000Z',
-      updated: '2024-01-20T10:00:00.000Z',
-      duedate: '2024-04-15T00:00:00.000Z',
-      issueType: 'Story'
-    },
-    {
-      id: '10003',
-      key: 'ECOMM-103',
-      summary: 'Payment gateway integration bug',
-      description: 'Users experiencing timeout errors during checkout process',
-      status: { name: 'In Review', category: 'In Progress' },
-      priority: 'Critical',
-      assignee: {
-        accountId: 'demo-dev-002',
-        displayName: 'Priya Patel',
-        emailAddress: 'priya.patel@demo.com'
-      },
-      reporter: {
-        accountId: 'demo-manager-001',
-        displayName: 'Michael Chen',
-        emailAddress: 'michael.chen@demo.com'
-      },
-      created: '2024-03-10T15:30:00.000Z',
-      updated: '2024-03-14T11:20:00.000Z',
-      duedate: '2024-03-20T00:00:00.000Z',
-      issueType: 'Bug'
-    }
-  ],
-  BANK: [
-    {
-      id: '10004',
-      key: 'BANK-101',
-      summary: 'Gather security requirements',
-      description: 'Document all security requirements for mobile banking app compliance',
-      status: { name: 'In Progress', category: 'In Progress' },
-      priority: 'High',
-      assignee: {
-        accountId: 'demo-ba-001',
-        displayName: 'Emily Rodriguez',
-        emailAddress: 'emily.rodriguez@demo.com'
-      },
-      reporter: {
-        accountId: 'demo-admin-001',
-        displayName: 'Sarah Johnson',
-        emailAddress: 'sarah.johnson@demo.com'
-      },
-      created: '2024-02-15T08:00:00.000Z',
-      updated: '2024-03-10T16:45:00.000Z',
-      duedate: '2024-03-31T00:00:00.000Z',
-      issueType: 'Epic'
-    },
-    {
-      id: '10005',
-      key: 'BANK-102',
-      summary: 'Security audit approval',
-      description: 'Obtain security audit approval from compliance team',
-      status: { name: 'Blocked', category: 'To Do' },
-      priority: 'Critical',
-      assignee: null,
-      reporter: {
-        accountId: 'demo-ba-001',
-        displayName: 'Emily Rodriguez',
-        emailAddress: 'emily.rodriguez@demo.com'
-      },
-      created: '2024-03-05T14:00:00.000Z',
-      updated: '2024-03-08T11:15:00.000Z',
-      duedate: '2024-03-25T00:00:00.000Z',
-      issueType: 'Task'
-    }
-  ],
-  API: [
-    {
-      id: '10006',
-      key: 'API-101',
-      summary: 'Deploy API Gateway to production',
-      description: 'Deploy the completed API Gateway to production environment',
-      status: { name: 'Done', category: 'Done' },
-      priority: 'High',
-      assignee: {
-        accountId: 'demo-dev-001',
-        displayName: 'Alex Thompson',
-        emailAddress: 'alex.thompson@demo.com'
-      },
-      reporter: {
-        accountId: 'demo-manager-001',
-        displayName: 'Michael Chen',
-        emailAddress: 'michael.chen@demo.com'
-      },
-      created: '2024-02-20T09:00:00.000Z',
-      updated: '2024-02-28T15:30:00.000Z',
-      duedate: '2024-02-28T00:00:00.000Z',
-      issueType: 'Story'
-    }
-  ]
+// Demo JIRA Project URLs
+export const getDemoJiraProjectUrl = (projectKey: string): string => {
+  return `${DEMO_JIRA_CONFIG.baseUrl}/projects/${projectKey}`;
 };
 
-// Utility functions for demo data
+export const getDemoJiraIssueUrl = (issueKey: string): string => {
+  return `${DEMO_JIRA_CONFIG.baseUrl}/browse/${issueKey}`;
+};
+
+// Demo Jira Issues with Sri Lankan context
+export const DEMO_JIRA_ISSUES = {
+  RETAILSL: [
+    {
+      id: "10001",
+      key: "RETAILSL-101",
+      summary: "Implement LankaQR payment integration",
+      description: "Integrate LankaQR for online payments in retail platform",
+      status: { name: "In Progress", category: "To Do" },
+      priority: "High",
+      assignee: {
+        accountId: "demo-dev-001",
+        displayName: "Kavinda Wickramasinghe",
+        emailAddress: "kavinda.wickramasinghe@demo.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.deshan@demo.com",
+      },
+      created: "2024-01-15T09:00:00.000Z",
+      updated: "2024-03-15T14:30:00.000Z",
+      duedate: "2024-03-30T00:00:00.000Z",
+      issueType: "Story",
+    },
+    {
+      id: "10002",
+      key: "RETAILSL-102",
+      summary: "Design Sinhala/Tamil UI components",
+      description:
+        "Create responsive UI components with Sinhala and Tamil support for retail platform",
+      status: { name: "To Do", category: "To Do" },
+      priority: "Medium",
+      assignee: {
+        accountId: "demo-designer-001",
+        displayName: "Sashini Silva",
+        emailAddress: "sashini.silva@demo.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.deshans@demo.com",
+      },
+      created: "2024-01-20T10:00:00.000Z",
+      updated: "2024-01-20T10:00:00.000Z",
+      duedate: "2024-04-15T00:00:00.000Z",
+      issueType: "Story",
+    },
+    {
+      id: "10003",
+      key: "RETAILSL-103",
+      summary: "Mobile payment integration bug",
+      description:
+        "Timeout errors when users try to pay with eZ Cash and mCash",
+      status: { name: "In Review", category: "In Progress" },
+      priority: "Critical",
+      assignee: {
+        accountId: "demo-dev-002",
+        displayName: "Ashan Fernando",
+        emailAddress: "ashan.fernando@demo.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.deshanss@demo.com",
+      },
+      created: "2024-03-10T15:30:00.000Z",
+      updated: "2024-03-14T11:20:00.000Z",
+      duedate: "2024-03-20T00:00:00.000Z",
+      issueType: "Bug",
+    },
+  ],
+  BANKSL: [
+    {
+      id: "10004",
+      key: "BANKSL-101",
+      summary: "Gather CBSL security requirements",
+      description: "Document CBSL compliance for mobile banking app",
+      status: { name: "In Progress", category: "In Progress" },
+      priority: "High",
+      assignee: {
+        accountId: "demo-ba-001",
+        displayName: "Dilini Perera",
+        emailAddress: "dilini.perera@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-02-15T08:00:00.000Z",
+      updated: "2024-03-10T16:45:00.000Z",
+      duedate: "2024-03-31T00:00:00.000Z",
+      issueType: "Epic",
+    },
+    {
+      id: "10005",
+      key: "BANKSL-102",
+      summary: "CBSL security audit approval",
+      description: "Obtain CBSL security audit approval for app launch",
+      status: { name: "Blocked", category: "To Do" },
+      priority: "Critical",
+      assignee: null,
+      reporter: {
+        accountId: "demo-ba-001",
+        displayName: "Dilini Perera",
+        emailAddress: "dilini.perera@theqexle.com",
+      },
+      created: "2024-03-05T14:00:00.000Z",
+      updated: "2024-03-08T11:15:00.000Z",
+      duedate: "2024-03-25T00:00:00.000Z",
+      issueType: "Task",
+    },
+    {
+      id: "10006",
+      key: "BANKSL-103",
+      summary: "Integrate local bank APIs",
+      description: "Integrate Sampath, Commercial, and BOC APIs into the mobile banking app",
+      status: { name: "To Do", category: "To Do" },
+      priority: "High",
+      assignee: {
+        accountId: "demo-dev-001",
+        displayName: "Kavinda Wickramasinghe",
+        emailAddress: "kavinda.wickramasinghe@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-03-12T09:10:00.000Z",
+      updated: "2024-03-12T09:10:00.000Z",
+      duedate: "2024-04-02T00:00:00.000Z",
+      issueType: "Story",
+    },
+    {
+      id: "10007",
+      key: "BANKSL-104",
+      summary: "Optimize mobile banking app for Sinhala/Tamil",
+      description: "Ensure UI/UX components support Sinhala and Tamil languages",
+      status: { name: "In Progress", category: "In Progress" },
+      priority: "Medium",
+      assignee: {
+        accountId: "demo-designer-001",
+        displayName: "Sashini Silva",
+        emailAddress: "sashini.silva@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-03-15T11:00:00.000Z",
+      updated: "2024-03-16T13:30:00.000Z",
+      duedate: "2024-04-10T00:00:00.000Z",
+      issueType: "Task",
+    },
+    {
+      id: "10008",
+      key: "BANKSL-105",
+      summary: "Test mobile banking app with local payment providers",
+      description: "Conduct UAT with eZ Cash and mCash payment integrations",
+      status: { name: "To Do", category: "To Do" },
+      priority: "High",
+      assignee: {
+        accountId: "demo-dev-002",
+        displayName: "Ashan Fernando",
+        emailAddress: "ashan.fernando@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-03-18T15:30:00.000Z",
+      updated: "2024-03-19T09:20:00.000Z",
+      duedate: "2024-04-20T00:00:00.000Z",
+      issueType: "Bug",
+    }
+  ],
+  APISL: [
+    {
+      id: "10006",
+      key: "APISL-101",
+      summary: "Deploy API Gateway to production environment",
+      description: "Deploy the completed API Gateway for Sri Lankan government and private APIs to the production environment.",
+      status: { name: "Done", category: "Done" },
+      priority: "High",
+      assignee: {
+        accountId: "demo-dev-001",
+        displayName: "Kavinda Wickramasinghe",
+        emailAddress: "kavinda.wickramasinghe@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-02-20T09:00:00.000Z",
+      updated: "2024-02-28T15:30:00.000Z",
+      duedate: "2024-02-28T00:00:00.000Z",
+      issueType: "Story",
+    },
+    {
+      id: "10007",
+      key: "APISL-102",
+      summary: "Integrate Registrar of Companies API",
+      description: "Connect the API Gateway with the Registrar of Companies API for business registration data.",
+      status: { name: "In Progress", category: "To Do" },
+      priority: "Medium",
+      assignee: {
+        accountId: "demo-dev-002",
+        displayName: "Ashan Fernando",
+        emailAddress: "ashan.fernando@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-03-01T10:00:00.000Z",
+      updated: "2024-03-15T09:00:00.000Z",
+      duedate: "2024-03-20T00:00:00.000Z",
+      issueType: "Task",
+    },
+    {
+      id: "10008",
+      key: "APISL-103",
+      summary: "Fix authentication error for government API endpoints",
+      description: "Investigate and resolve authentication failures when accessing government API endpoints via the gateway.",
+      status: { name: "Blocked", category: "In Progress" },
+      priority: "Critical",
+      assignee: {
+        accountId: "demo-dev-001",
+        displayName: "Kavinda Wickramasinghe",
+        emailAddress: "kavinda.wickramasinghe@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-manager-001",
+        displayName: "Nadeesha Jayawardena",
+        emailAddress: "nadeesha.jayawardena@theqexle.com",
+      },
+      created: "2024-03-05T13:30:00.000Z",
+      updated: "2024-03-08T12:15:00.000Z",
+      duedate: "2024-03-10T00:00:00.000Z",
+      issueType: "Bug",
+    },
+    {
+      id: "10009",
+      key: "APISL-104",
+      summary: "Optimize response time for API Gateway endpoints",
+      description: "Improve the performance and response time for all endpoints routed through the API Gateway.",
+      status: { name: "To Do", category: "To Do" },
+      priority: "High",
+      assignee: {
+        accountId: "demo-dev-002",
+        displayName: "Ashan Fernando",
+        emailAddress: "ashan.fernando@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-03-11T08:00:00.000Z",
+      updated: "2024-03-11T08:00:00.000Z",
+      duedate: "2024-03-25T00:00:00.000Z",
+      issueType: "Task",
+    },
+    {
+      id: "10010",
+      key: "APISL-105",
+      summary: "Document API Gateway endpoints for clients",
+      description: "Prepare comprehensive documentation for all API Gateway endpoints for The Qexle clients.",
+      status: { name: "In Review", category: "In Progress" },
+      priority: "Medium",
+      assignee: {
+        accountId: "demo-designer-001",
+        displayName: "Sashini Silva",
+        emailAddress: "sashini.silva@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-03-14T14:00:00.000Z",
+      updated: "2024-03-16T10:30:00.000Z",
+      duedate: "2024-03-20T00:00:00.000Z",
+      issueType: "Story",
+    }
+  ],
+  PORTALSL: [
+    {
+      id: "20001",
+      key: "PORTALSL-101",
+      summary: "Implement Sinhala/Tamil language toggle",
+      description: "Add a language toggle for Sinhala and Tamil in the customer portal UI.",
+      status: { name: "To Do", category: "To Do" },
+      priority: "High",
+      assignee: {
+        accountId: "demo-designer-001",
+        displayName: "Sashini Silva",
+        emailAddress: "sashini.silva@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-04-01T09:00:00.000Z",
+      updated: "2024-04-01T09:00:00.000Z",
+      duedate: "2024-04-15T00:00:00.000Z",
+      issueType: "Story",
+    },
+    {
+      id: "20002",
+      key: "PORTALSL-102",
+      summary: "Add EPF/ETF integration for payroll",
+      description: "Integrate EPF and ETF services for employee payroll in the portal.",
+      status: { name: "In Progress", category: "In Progress" },
+      priority: "Critical",
+      assignee: {
+        accountId: "demo-dev-001",
+        displayName: "Kavinda Wickramasinghe",
+        emailAddress: "kavinda.wickramasinghe@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-04-10T08:10:00.000Z",
+      updated: "2024-05-01T10:20:00.000Z",
+      duedate: "2024-05-15T00:00:00.000Z",
+      issueType: "Task",
+    },
+    {
+      id: "20003",
+      key: "PORTALSL-103",
+      summary: "Fix mobile layout for customer portal",
+      description: "Resolve issues with mobile responsiveness in the customer portal interfaces.",
+      status: { name: "Review", category: "In Progress" },
+      priority: "Medium",
+      assignee: {
+        accountId: "demo-designer-001",
+        displayName: "Sashini Silva",
+        emailAddress: "sashini.silva@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-05-11T09:45:00.000Z",
+      updated: "2024-05-12T11:00:00.000Z",
+      duedate: "2024-05-20T00:00:00.000Z",
+      issueType: "Bug",
+    }
+  ],
+  ANALYTICSSL: [
+    {
+      id: "30001",
+      key: "ANALYTICSSL-101",
+      summary: "Integrate Department of Census & Statistics data",
+      description: "Fetch and visualize Sri Lankan census datasets on the analytics dashboard.",
+      status: { name: "To Do", category: "To Do" },
+      priority: "High",
+      assignee: {
+        accountId: "demo-dev-002",
+        displayName: "Ashan Fernando",
+        emailAddress: "ashan.fernando@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-03-20T10:00:00.000Z",
+      updated: "2024-03-20T10:00:00.000Z",
+      duedate: "2024-04-10T00:00:00.000Z",
+      issueType: "Story",
+    },
+    {
+      id: "30002",
+      key: "ANALYTICSSL-102",
+      summary: "Optimize chart rendering for large datasets",
+      description: "Improve D3.js chart performance when displaying large Sri Lankan datasets.",
+      status: { name: "In Progress", category: "In Progress" },
+      priority: "Critical",
+      assignee: {
+        accountId: "demo-dev-002",
+        displayName: "Ashan Fernando",
+        emailAddress: "ashan.fernando@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-03-28T15:00:00.000Z",
+      updated: "2024-04-01T11:10:00.000Z",
+      duedate: "2024-04-12T00:00:00.000Z",
+      issueType: "Task",
+    },
+    {
+      id: "30003",
+      key: "ANALYTICSSL-103",
+      summary: "Bug: Dashboard does not load for some districts",
+      description: "Fix issue where analytics dashboard fails to load data for certain districts in Sri Lanka.",
+      status: { name: "Blocked", category: "In Progress" },
+      priority: "High",
+      assignee: {
+        accountId: "demo-dev-002",
+        displayName: "Ashan Fernando",
+        emailAddress: "ashan.fernando@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-04-10T09:30:00.000Z",
+      updated: "2024-04-11T13:00:00.000Z",
+      duedate: "2024-04-15T00:00:00.000Z",
+      issueType: "Bug",
+    }
+  ],
+  ONBOARDINGSL: [
+    {
+      id: "40001",
+      key: "ONBOARDINGSL-101",
+      summary: "Integrate Sri Lanka Insurance onboarding API",
+      description: "Connect onboarding portal with Sri Lanka Insurance API for automated onboarding.",
+      status: { name: "To Do", category: "To Do" },
+      priority: "High",
+      assignee: {
+        accountId: "demo-dev-003",
+        displayName: "Devaka Peris",
+        emailAddress: "devaka.peris@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-02-20T08:30:00.000Z",
+      updated: "2024-02-20T08:30:00.000Z",
+      duedate: "2024-03-10T00:00:00.000Z",
+      issueType: "Story",
+    },
+    {
+      id: "40002",
+      key: "ONBOARDINGSL-102",
+      summary: "Add SMS gateway for OTP verification",
+      description: "Implement SMS gateway integration for onboarding portal OTP verification (Dialog/Airtel/Sri Lanka Telecom).",
+      status: { name: "In Progress", category: "In Progress" },
+      priority: "Medium",
+      assignee: {
+        accountId: "demo-dev-003",
+        displayName: "Devaka Peris",
+        emailAddress: "devaka.peris@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-02-28T11:00:00.000Z",
+      updated: "2024-03-01T14:00:00.000Z",
+      duedate: "2024-03-10T00:00:00.000Z",
+      issueType: "Task",
+    },
+    {
+      id: "40003",
+      key: "ONBOARDINGSL-103",
+      summary: "Bug: Incomplete data on onboarding confirmation",
+      description: "Investigate and fix bug where some users receive incomplete data on onboarding confirmation page.",
+      status: { name: "Blocked", category: "In Progress" },
+      priority: "High",
+      assignee: {
+        accountId: "demo-dev-003",
+        displayName: "Devaka Peris",
+        emailAddress: "devaka.peris@theqexle.com",
+      },
+      reporter: {
+        accountId: "demo-admin-001",
+        displayName: "Susith Deshan Alwis",
+        emailAddress: "susith.alwis@theqexle.com",
+      },
+      created: "2024-03-05T16:00:00.000Z",
+      updated: "2024-03-07T10:30:00.000Z",
+      duedate: "2024-03-15T00:00:00.000Z",
+      issueType: "Bug",
+    }
+  ],
+};
+
+// Utility functions for demo data (unchanged)
 export function getDemoUserByEmail(email: string): User | undefined {
-  return DEMO_USERS.find(user => user.email.toLowerCase() === email.toLowerCase());
+  return DEMO_USERS.find(
+    (user) => user.email.toLowerCase() === email.toLowerCase(),
+  );
 }
 
 export function getDemoUserById(id: string): User | undefined {
-  return DEMO_USERS.find(user => user.id === id);
+  return DEMO_USERS.find((user) => user.id === id);
 }
 
 export function getDemoProjectById(id: number): Project | undefined {
-  return DEMO_PROJECTS.find(project => project.id === Number(id) || project.id.toString() === id);
+  return DEMO_PROJECTS.find(
+    (project) => project.id === Number(id) || project.id.toString() === id,
+  );
 }
 
 export function getDemoJiraProjectByKey(key: string): any | undefined {
-  return DEMO_JIRA_PROJECTS.find(project => project.key === key);
+  return DEMO_JIRA_PROJECTS.find((project) => project.key === key);
 }
 
 export function getDemoJiraIssuesByProject(projectKey: string): any[] {
