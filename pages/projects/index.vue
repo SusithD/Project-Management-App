@@ -303,7 +303,7 @@ const exportToExcel = () => {
     const summaryData = [
       [''], // Empty row for spacing
       ['PROJECTS'], 
-      ['CoverageX Project Management System'],
+      ['The Qexle Project Management System'],
       [''],
       [`Generated: ${new Date().toLocaleDateString('en-US', {
         year: 'numeric',
@@ -452,7 +452,7 @@ const exportToExcel = () => {
     // Create and save Excel file with minimal filename
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/octet-stream' });
-    saveAs(blob, `coveragex-projects-${new Date().toISOString().substring(0, 10)}.xlsx`);
+    saveAs(blob, `theqexle-projects-${new Date().toISOString().substring(0, 10)}.xlsx`);
 
     setTimeout(() => {
       isExporting.value = false;
@@ -506,7 +506,7 @@ const exportToPDF = () => {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(14);
     doc.setTextColor(...mono.medium);
-    doc.text('CoverageX Project Management', 15, 35);
+    doc.text('The qexle Project Management', 15, 35);
     
     // Date
     const date = new Date().toLocaleDateString('en-US', {
@@ -817,11 +817,11 @@ const exportToPDF = () => {
       doc.setFontSize(8);
       doc.setTextColor(...mono.medium);
       doc.text(`Page ${index + 2} of ${projectsStore.projects.length + 1}`, doc.internal.pageSize.getWidth() - 40, doc.internal.pageSize.getHeight() - 10);
-      doc.text("CoverageX", 15, doc.internal.pageSize.getHeight() - 10);
+      doc.text("The qexle", 15, doc.internal.pageSize.getHeight() - 10);
     });
     
     // Save with clean filename
-    doc.save(`coveragex_projects_${new Date().toISOString().substring(0, 10)}.pdf`);
+    doc.save(`the_qexle_projects_${new Date().toISOString().substring(0, 10)}.pdf`);
     
     setTimeout(() => {
       isExporting.value = false;

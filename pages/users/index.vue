@@ -274,7 +274,7 @@
               id="email"
               v-model="newUser.email"
               class="input-field w-full"
-              placeholder="e.g. mbandara@Coveragex.com"
+              placeholder="e.g. susithalwis@theqexle.com"
               required
             />
           </div>

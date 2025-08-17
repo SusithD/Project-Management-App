@@ -16,7 +16,7 @@ const EMAIL_PORT = parseInt(config.email?.port || process.env.EMAIL_PORT || '587
 const EMAIL_USER = config.email?.user || process.env.EMAIL_USER || '';
 const EMAIL_PASS = config.email?.password || process.env.EMAIL_PASS || '';
 const EMAIL_FROM = config.email?.from || process.env.EMAIL_FROM || 'noreply@projectmanagement.com';
-const APP_NAME = 'CoverageX Project Management';
+const APP_NAME = 'The qexle Project Management';
 
 // Maximum number of retry attempts for sending emails
 const MAX_RETRY_ATTEMPTS = 3;
