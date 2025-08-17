@@ -205,7 +205,17 @@ const fetchProjects = async () => {
   fetchingProjects.value = true;
   
   try {
-    const response = await fetch('/api/jira/projects');
+    // Add user email for demo mode detection
+    const authStore = useAuthStore();
+    const queryParams = new URLSearchParams();
+    if (authStore.userEmail) {
+      queryParams.append('userEmail', authStore.userEmail);
+    }
+    
+    const queryString = queryParams.toString();
+    const url = `/api/jira/projects${queryString ? '?' + queryString : ''}`;
+    
+    const response = await fetch(url);
     const data = await response.json();
     
     if (data.body?.success || data.success) {
@@ -229,7 +239,19 @@ const fetchProjectIssues = async (projectKey) => {
   issues.value = [];
   
   try {
-    const response = await fetch(`/api/jira/issues?projectKey=${projectKey}&maxResults=20`);
+    // Add user email for demo mode detection
+    const authStore = useAuthStore();
+    const queryParams = new URLSearchParams();
+    queryParams.append('projectKey', projectKey);
+    queryParams.append('maxResults', '20');
+    if (authStore.userEmail) {
+      queryParams.append('userEmail', authStore.userEmail);
+    }
+    
+    const queryString = queryParams.toString();
+    const url = `/api/jira/issues?${queryString}`;
+    
+    const response = await fetch(url);
     const data = await response.json();
     
     if (data.body?.success || data.success) {
