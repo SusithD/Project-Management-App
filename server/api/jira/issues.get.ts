@@ -1,5 +1,7 @@
 import { defineEventHandler, getQuery } from 'h3';
 import { getJiraClient } from '~/server/utils/jira';
+import { isDemoMode, isDemoUserEmail } from '~/server/utils/demo-mode';
+import { DEMO_JIRA_ISSUES } from '~/server/utils/demo-data';
 
 /**
  * Get JIRA issues for a specific project
@@ -18,6 +20,33 @@ export default defineEventHandler(async (event) => {
         body: {
           success: false,
           message: 'Project key is required'
+        }
+      };
+    }
+    
+    // Check if demo mode is enabled
+    const demoMode = isDemoMode();
+    
+    // Get user email from query parameter (sent by client)
+    const queryParams = getQuery(event);
+    const userEmail = queryParams.userEmail as string;
+    
+    // Check if current user is a demo user
+    const isDemoUser = userEmail && isDemoUserEmail(userEmail);
+    
+    if (demoMode && isDemoUser) {
+      console.log(`[JIRA API] Returning demo issues for project: ${projectKey}`);
+      
+      const demoIssues = DEMO_JIRA_ISSUES[projectKey] || [];
+      const limitedIssues = demoIssues.slice(0, maxResults);
+      
+      return {
+        statusCode: 200,
+        body: {
+          success: true,
+          projectKey,
+          issues: limitedIssues,
+          demoMode: true
         }
       };
     }
@@ -58,7 +87,8 @@ export default defineEventHandler(async (event) => {
           updated: issue.fields.updated,
           duedate: issue.fields.duedate,
           issueType: issue.fields.issuetype.name
-        }))
+        })),
+        demoMode: false
       }
     };
   } catch (error) {
