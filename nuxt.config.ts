@@ -36,15 +36,18 @@ export default defineNuxtConfig({
       projectKey: process.env.JIRA_PROJECT_KEY || "",
       enabled: process.env.JIRA_ENABLED === "true",
     },
+    // JWT secret for session management
+    jwtSecret: process.env.JWT_SECRET || 'demo-jwt-secret-key',
+    
     // Public environment variables
     public: {
       appUrl: process.env.APP_URL || "http://localhost:3000",
-      // Demo mode configuration
-      demoMode: process.env.DEMO_MODE === "true",
+      // Demo mode configuration - Enable demo mode by default in development and when DEMO_MODE=true
+      demoMode: process.env.DEMO_MODE === "true" || process.env.NODE_ENV === "development",
       // Add Jira base URL to public config for client-side access
       jira: {
         baseUrl:
-          process.env.DEMO_MODE === "true"
+          process.env.DEMO_MODE === "true" || process.env.NODE_ENV === "development"
             ? "https://demo-company.atlassian.net"
             : process.env.JIRA_BASE_URL || "",
       },
@@ -64,6 +67,20 @@ export default defineNuxtConfig({
         },
       },
     },
+  },
+
+  // Add demo mode configuration hook
+  hooks: {
+    'render:route': (url, result, context) => {
+      const isDemoMode = process.env.DEMO_MODE === "true" || process.env.NODE_ENV === "development";
+      if (isDemoMode) {
+        // Add demo mode indicators to the page
+        result.html = result.html.replace(
+          '<body',
+          '<body data-demo-mode="true"'
+        );
+      }
+    }
   },
 
   app: {
@@ -112,19 +129,15 @@ export default defineNuxtConfig({
     "/login": { ssr: false },
     "/demo-login": { ssr: false },
     "/auth/**": { ssr: false },
+    "/test-demo": { ssr: false },
 
     // Protected routes that need authentication
     "/dashboard": { ssr: false },
     "/dashboard/**": { ssr: false },
     "/projects/**": { ssr: false },
     "/users/**": { ssr: false },
-    "/tasks/**": { ssr: false },
+    "/admin/**": { ssr: false },
     "/settings/**": { ssr: false },
     "/reports/**": { ssr: false },
-  },
-
-  // Adding an alias for the dashboard
-  alias: {
-    "/dashboard": "~/pages/dashboard.vue",
   },
 });

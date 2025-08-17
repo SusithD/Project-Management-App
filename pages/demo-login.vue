@@ -1,5 +1,5 @@
 <script setup>
-import { ref, inject, onMounted } from 'vue';
+import { ref, inject, onMounted, computed } from 'vue';
 
 // Page metadata - use default layout (not dashboard)
 definePageMeta({
@@ -14,23 +14,41 @@ const isLoading = ref(false);
 const showAnimation = ref(false);
 const selectedUser = ref(null);
 const showUserSelection = ref(false);
+const errorMessage = ref('');
 
-// Demo login function
+// Get runtime config to check demo mode
+const config = useRuntimeConfig();
+const isDemoMode = computed(() => config.public.demoMode);
+
+// Demo login function with better error handling
 const handleDemoLogin = async (user) => {
+  if (isLoading.value) return;
+  
   isLoading.value = true;
+  errorMessage.value = '';
+  
   try {
-    // Simulate login delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('Demo login attempt for user:', user.name);
+    
+    // Simulate login delay for realism
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Get auth store
+    const authStore = useAuthStore();
+    
+    // Validate that we're in demo mode
+    if (!isDemoMode.value) {
+      throw new Error('Demo mode is not enabled');
+    }
     
     // Set demo user in auth store
-    const authStore = useAuthStore();
     authStore.setDemoUser({
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
       roleName: user.role,
-      permissions: [], // Will be set by the store
+      permissions: [], // Will be set by the store based on role
       lastActive: new Date().toISOString(),
       joinedAt: user.joinedAt,
       avatar: user.avatar,
@@ -39,10 +57,14 @@ const handleDemoLogin = async (user) => {
       availability: user.availability
     });
     
+    console.log('Demo user set successfully, navigating to dashboard...');
+    
     // Navigate to dashboard
     await navigateTo('/dashboard');
+    
   } catch (error) {
     console.error('Demo login error:', error);
+    errorMessage.value = error.message || 'Failed to login with demo user. Please try again.';
   } finally {
     isLoading.value = false;
   }
@@ -123,8 +145,15 @@ const usageInstructions = [
 const showFeatures = ref(false);
 const showInstructions = ref(false);
 
-// Add animation effect when page loads
+// Check if demo mode is enabled on mount
 onMounted(() => {
+  console.log('Demo mode status:', isDemoMode.value);
+  console.log('Available demo users:', DEMO_USERS.length);
+  
+  if (!isDemoMode.value) {
+    errorMessage.value = 'Demo mode is not enabled. Please check your configuration.';
+  }
+  
   setTimeout(() => {
     showAnimation.value = true;
   }, 100);
@@ -332,6 +361,25 @@ onMounted(() => {
                       <span class="mdi mdi-chevron-right text-neutral-400 group-hover:text-primary-600 transition-colors"></span>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Error Message -->
+            <div v-if="errorMessage" class="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div class="flex items-start">
+                <div class="flex-shrink-0">
+                  <span class="mdi mdi-alert-circle text-red-600 text-lg"></span>
+                </div>
+                <div class="ml-3">
+                  <h4 class="text-sm font-medium text-red-900">Login Error</h4>
+                  <p class="text-sm text-red-800 mt-1">{{ errorMessage }}</p>
+                  <button 
+                    @click="errorMessage = ''"
+                    class="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+                  >
+                    Dismiss
+                  </button>
                 </div>
               </div>
             </div>
