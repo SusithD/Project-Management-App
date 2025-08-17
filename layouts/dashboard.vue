@@ -13,6 +13,9 @@
     
     <!-- Notifications -->
     <AppNotifications />
+    
+    <!-- Demo Mode Indicator -->
+    <DemoModeIndicator />
   </div>
 </template>
 
@@ -22,6 +25,7 @@ import { useAuthStore } from '~/stores/auth';
 import AppSidebar from '~/components/app/Sidebar.vue';
 import AppHeader from '~/components/app/Header.vue';
 import AppNotifications from '~/components/app/Notifications.vue';
+import DemoModeIndicator from '~/components/common/DemoModeIndicator.vue';
 
 // Get the authentication store
 const authStore = useAuthStore();
