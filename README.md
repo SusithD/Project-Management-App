@@ -2,7 +2,7 @@
 
 A comprehensive, enterprise-grade project management platform built with modern web technologies. This application provides powerful project tracking, team collaboration, JIRA integration, and role-based access control to streamline project workflows and enhance team productivity.
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Available-green)](https://coveragex-project-management-app.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Available-green)](https://theqexle-project-management-app.vercel.app)
 [![Nuxt 3](https://img.shields.io/badge/Nuxt-3.13.0-00DC82)](https://nuxt.com/)
 [![Vue 3](https://img.shields.io/badge/Vue-3.x-4FC08D)](https://vuejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-3178C6)](https://www.typescriptlang.org/)
@@ -11,7 +11,7 @@ A comprehensive, enterprise-grade project management platform built with modern 
 ## 🚀 Live Demo
 
 **Experience the application without any setup:**
-[https://coveragex-project-management-app.vercel.app](https://coveragex-project-management-app.vercel.app)
+[https://theqexle-project-management-app.vercel.app](https://theqexle-project-management-app.vercel.app)
 
 ### Demo Users Available
 Choose from different roles to explore various permission levels:
@@ -445,7 +445,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Documentation**: Check the `/docs` folder for detailed guides
 - **Issues**: Report bugs via [GitHub Issues](https://github.com/your-username/project-management-app/issues)
-- **Demo**: Try the live demo at [https://coveragex-project-management-app.vercel.app](https://coveragex-project-management-app.vercel.app)
+- **Demo**: Try the live demo at [https://theqexle-project-management-app.vercel.app](https://theqexle-project-management-app.vercel.app)
 
 ## 🙏 Acknowledgments
 
@@ -456,4 +456,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Ready to get started?** Visit our [live demo](https://coveragex-project-management-app.vercel.app) or follow the [Quick Start](#-quick-start) guide to set up your own instance!
+**Ready to get started?** Visit our [live demo](https://theqexle-project-management-app.vercel.app) or follow the [Quick Start](#-quick-start) guide to set up your own instance!
